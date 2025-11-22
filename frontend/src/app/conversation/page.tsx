@@ -1,4 +1,4 @@
-'use client'
+"use client";
 
 import { useRouter } from "next/navigation";
 import { useState, useEffect, useRef } from "react";
@@ -6,11 +6,11 @@ import ReactMarkdown from "react-markdown";
 import { ArrowRight, ArrowUp } from "lucide-react";
 
 interface Message {
-    role: 'user' | 'assistant';
-    content: string;
+  role: "user" | "assistant";
+  content: string;
 }
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL
+const API_URL = process.env.NEXT_PUBLIC_API_URL;
 
 export default function Conversation() {
   const router = useRouter();
@@ -27,85 +27,102 @@ export default function Conversation() {
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const hasInitialized = useRef(false);
 
-    const handleSendMessage = async (message: string) => {
-        if (!message.trim()) return;
+  const handleSendMessage = async (message: string) => {
+    if (!message.trim()) return;
 
-        const userMessage: Message = { role: 'user', content: message };
-        setMessages(prev => [...prev, userMessage]);
-        setInputValue("");
-        setIsLoading(true);
+    const userMessage: Message = { role: "user", content: message };
+    setMessages((prev) => [...prev, userMessage]);
+    setInputValue("");
+    setIsLoading(true);
 
-        try {
-            const requestBody: { message: string; session_id?: string } = { message };
-            if (sessionId) {
-                requestBody.session_id = sessionId;
-            }
+    try {
+      const requestBody: { message: string; session_id?: string } = { message };
+      if (sessionId) {
+        requestBody.session_id = sessionId;
+      }
 
-            const response = await fetch(`${API_URL}/chat`, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify(requestBody),
-            });
+      const response = await fetch(`${API_URL}/chat`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(requestBody),
+      });
 
-            if (!response.ok) {
-                throw new Error('Failed to get response');
-            }
+      if (!response.ok) {
+        throw new Error("Failed to get response");
+      }
 
-            const data = await response.json();
+      const data = await response.json();
 
-            if (data.session_id && !sessionId) {
-                setSessionId(data.session_id);
-            }
+      if (data.session_id && !sessionId) {
+        setSessionId(data.session_id);
+      }
 
-            // Update temperature from response
-            if (data.temperature !== undefined) {
-                setTemperature(data.temperature);
-            }
+      // Update temperature from response
+      if (data.temperature !== undefined) {
+        setTemperature(data.temperature);
+      }
 
-            // Parse the message field which contains JSON
-            let messageContent = data.message || 'No se recibió respuesta del servidor.';
-            try {
-                // Check if message contains JSON (starts with ```json)
-                if (messageContent.includes('```json')) {
-                    const jsonMatch = messageContent.match(/```json\n([\s\S]*?)\n```/);
-                    if (jsonMatch && jsonMatch[1]) {
-                        const parsedJson = JSON.parse(jsonMatch[1]);
-                        messageContent = parsedJson.message || messageContent;
-                    }
-                }
-            } catch (error) {
-                console.error('Error parsing message JSON:', error);
-            }
-
-            const assistantMessage: Message = {
-                role: 'assistant',
-                content: messageContent
-            };
-            setMessages(prev => [...prev, assistantMessage]);
-        } catch (error) {
-            console.error('Error sending message:', error);
-            const assistantMessage: Message = {
-                role: 'assistant',
-                content: 'Error al conectar con el servidor. Por favor intenta de nuevo.'
-            };
-            setMessages(prev => [...prev, assistantMessage]);
-        } finally {
-            setIsLoading(false);
+      // Parse the message field which contains JSON
+      let messageContent =
+        data.message || "No se recibió respuesta del servidor.";
+      try {
+        // Check if message contains JSON (starts with ```json)
+        if (messageContent.includes("```json")) {
+          const jsonMatch = messageContent.match(/```json\n([\s\S]*?)\n```/);
+          if (jsonMatch && jsonMatch[1]) {
+            const parsedJson = JSON.parse(jsonMatch[1]);
+            messageContent = parsedJson.message || messageContent;
+          }
         }
-    };
+      } catch (error) {
+        console.error("Error parsing message JSON:", error);
+      }
 
-    useEffect(() => {
-        if (hasInitialized.current) return;
-        hasInitialized.current = true;
+      const assistantMessage: Message = {
+        role: "assistant",
+        content: messageContent,
+      };
+      setMessages((prev) => [...prev, assistantMessage]);
+    } catch (error) {
+      console.error("Error sending message:", error);
+      const assistantMessage: Message = {
+        role: "assistant",
+        content:
+          "Error al conectar con el servidor. Por favor intenta de nuevo.",
+      };
+      setMessages((prev) => [...prev, assistantMessage]);
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
-        const savedMessages = localStorage.getItem('conversation-messages');
-        const savedSessionId = localStorage.getItem('conversation-session-id');
+  useEffect(() => {
+    if (hasInitialized.current) return;
+    hasInitialized.current = true;
 
-        if (savedSessionId) {
-            setSessionId(savedSessionId);
+    const savedMessages = localStorage.getItem("conversation-messages");
+    const savedSessionId = localStorage.getItem("conversation-session-id");
+
+    if (savedSessionId) {
+      setSessionId(savedSessionId);
+    }
+
+    if (savedMessages) {
+      try {
+        const parsed = JSON.parse(savedMessages);
+        if (parsed.length === 1) {
+          handleSendMessage(parsed[0].content);
+        } else {
+          setMessages(parsed);
         }
+      } catch (error) {
+        console.error("Error loading messages:", error);
+      }
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   useEffect(() => {
     if (messages.length > 0) {
@@ -179,8 +196,10 @@ export default function Conversation() {
             messageContent = parsedJson.message || messageContent;
           }
         }
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, []);
+      } catch (error) {
+        console.error("Error parsing synthesis message JSON:", error);
+        // Keep original message if parsing fails
+      }
 
       setSynthesisMessage(messageContent);
       setEditableSynthesis(messageContent);
@@ -197,37 +216,68 @@ export default function Conversation() {
     }
   };
 
-    useEffect(() => {
-        if (sessionId) {
-            localStorage.setItem('conversation-session-id', sessionId);
-        }
-    }, [sessionId]);
+  const handleCreateJobs = async () => {
+    try {
+      setIsLoading(true);
+      const problemDeclaration = editableSynthesis || synthesisMessage || "";
 
-    useEffect(() => {
-        messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-    }, [messages]);
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 900000);
 
-    const handleSubmit = (e: React.FormEvent) => {
-        e.preventDefault();
-        handleSendMessage(inputValue);
-    };
+      const response = await fetch(`${API_URL}/jobs`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          full_problem_declaration: problemDeclaration,
+          session_id: sessionId,
+        }),
+        signal: controller.signal,
+      });
 
-    const handleClearConversation = () => {
-        setMessages([]);
-        setSessionId(null);
-        localStorage.removeItem('conversation-messages');
-        localStorage.removeItem('conversation-session-id');
-    };
+      clearTimeout(timeoutId);
 
-    const handleSynthesizeConversation = async () => {
-        const synthesisPrompt = "Sintetiza esta conversación y dame el problema de fondo";
-        setIsLoading(true);
+      if (response.ok) {
+        const data = await response.json();
+        localStorage.setItem("current-jobs", JSON.stringify(data.jobs));
+        setIsLoading(false);
+        router.push("/jobs");
+      } else {
+        console.error("Failed to create jobs");
+        setIsLoading(false);
+        router.push("/jobs");
+      }
+    } catch (error) {
+      console.error("Error creating jobs:", error);
+      router.push("/jobs");
+      setIsLoading(false);
+    }
+  };
 
-        try {
-            const requestBody: { message: string; session_id?: string } = { message: synthesisPrompt };
-            if (sessionId) {
-                requestBody.session_id = sessionId;
-            }
+  return (
+    <div className="flex min-h-screen flex-col bg-(--color-background)">
+      {/* Header */}
+      <header className="border-b border-(--color-border) bg-(--color-background) px-6 py-4">
+        <div className="mx-auto flex max-w-4xl items-center justify-between">
+          <button
+            onClick={() => router.push("/")}
+            className="cursor-pointer text-sm text-(--color-text-secondary) transition-colors hover:text-(--color-text)"
+          >
+            ← Volver al inicio
+          </button>
+          <h1 className="text-lg font-semibold text-(--color-text)">
+            AI Conversation
+          </h1>
+          <button
+            onClick={handleClearConversation}
+            className="cursor-pointer text-sm text-(--color-text-secondary) transition-colors hover:text-red-400"
+            title="Clear conversation"
+          >
+            Limpiar
+          </button>
+        </div>
+      </header>
 
       {/* Messages Container */}
       <div
@@ -244,13 +294,53 @@ export default function Conversation() {
             </div>
           )}
 
-            if (!response.ok) {
-                throw new Error('Failed to get response');
-            }
+          {messages.map((message, index) => (
+            <div
+              key={index}
+              className={`flex ${
+                message.role === "user" ? "justify-end" : "justify-start"
+              }`}
+            >
+              <div
+                className={`max-w-[80%] rounded-lg px-4 py-3 ${
+                  message.role === "user"
+                    ? "bg-(--color-primary) text-white"
+                    : "border border-(--color-border) bg-(--color-input-bg) text-(--color-text)"
+                }`}
+              >
+                {message.role === "assistant" ? (
+                  <div className="prose prose-sm max-w-none text-(--color-text) prose-strong:font-semibold">
+                    <ReactMarkdown>{message.content}</ReactMarkdown>
+                  </div>
+                ) : (
+                  <p className="whitespace-pre-wrap text-sm leading-relaxed">
+                    {message.content}
+                  </p>
+                )}
+              </div>
+            </div>
+          ))}
 
-            const data = await response.json();
-            setSynthesisMessage(data.message || 'No se recibió respuesta del servidor.');
-            setEditableSynthesis(data.message || 'No se recibió respuesta del servidor.');
+          {isLoading && (
+            <div className="flex justify-start">
+              <div className="max-w-[80%] rounded-lg border border-(--color-border) bg-(--color-input-bg) px-4 py-3">
+                <div className="flex items-center space-x-2">
+                  <div
+                    className="h-2 w-2 animate-bounce rounded-full bg-(--color-text-secondary)"
+                    style={{ animationDelay: "0ms" }}
+                  ></div>
+                  <div
+                    className="h-2 w-2 animate-bounce rounded-full bg-(--color-text-secondary)"
+                    style={{ animationDelay: "100ms" }}
+                  ></div>
+                  <div
+                    className="h-2 w-2 animate-bounce rounded-full bg-(--color-text-secondary)"
+                    style={{ animationDelay: "300ms" }}
+                  ></div>
+                </div>
+              </div>
+            </div>
+          )}
 
           {/* Choice Component in Flow - Shows when threshold is reached */}
           {temperature >= 6 && !continueRefining && (
@@ -539,5 +629,7 @@ export default function Conversation() {
             </div>
           </div>
         </div>
-    );
+      )}
+    </div>
+  );
 }
