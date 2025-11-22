@@ -35,6 +35,19 @@ class HackatonPlatanusStack(Stack):
             point_in_time_recovery=True
         )
 
+        # Create DynamoDB table for conversations
+        conversations_table = dynamodb.Table(
+            self, "ConversationsTable",
+            table_name="conversations",
+            partition_key=dynamodb.Attribute(
+                name="jobId",
+                type=dynamodb.AttributeType.STRING
+            ),
+            billing_mode=dynamodb.BillingMode.PAY_PER_REQUEST,
+            removal_policy=RemovalPolicy.DESTROY,
+            point_in_time_recovery=True
+        )
+
         # Create SQS Queues
         slack_queue = sqs.Queue(
             self, "SlackQueue",
@@ -87,14 +100,19 @@ class HackatonPlatanusStack(Stack):
         slack_worker = _lambda.Function(
             self, "SlackWorker",
             runtime=_lambda.Runtime.PYTHON_3_11,
-            handler="slack_worker.handler",
+            handler="slack_worker.lambda_handler",
             code=_lambda.Code.from_asset(lambda_code_path),
             timeout=Duration.seconds(300),
             memory_size=512,
             description="Processes Slack jobs",
             function_name="slack_worker",
             environment={
-                "JOBS_TABLE_NAME": jobs_table.table_name
+                "JOBS_TABLE_NAME": jobs_table.table_name,
+                "CONVERSATIONS_TABLE_NAME": conversations_table.table_name,
+                "SLACK_QUEUE_URL": slack_queue.queue_url,
+                # These should be set via environment variables or AWS Secrets Manager
+                "SLACK_BOT_TOKEN": os.environ.get("SLACK_BOT_TOKEN", ""),
+                "ANTHROPIC_API_KEY": os.environ.get("ANTHROPIC_API_KEY", "")
             }
         )
 
@@ -130,6 +148,12 @@ class HackatonPlatanusStack(Stack):
         jobs_table.grant_read_write_data(slack_worker)
         jobs_table.grant_read_write_data(market_research_worker)
         jobs_table.grant_read_write_data(external_research_worker)
+        
+        # Grant conversations table permissions to slack worker
+        conversations_table.grant_read_write_data(slack_worker)
+        
+        # Grant SQS permissions to slack worker for requeuing
+        slack_queue.grant_send_messages(slack_worker)
 
         # Connect queues to worker lambdas
         slack_worker.add_event_source(
@@ -227,9 +251,15 @@ class HackatonPlatanusStack(Stack):
             description="External research queue URL"
         )
 
-        # Output DynamoDB table name
+        # Output DynamoDB table names
         CfnOutput(
             self, "JobsTableName",
             value=jobs_table.table_name,
             description="Jobs DynamoDB table name"
+        )
+
+        CfnOutput(
+            self, "ConversationsTableName",
+            value=conversations_table.table_name,
+            description="Conversations DynamoDB table name"
         )
