@@ -230,7 +230,7 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
                     )
                     logger.info(f"Sent message for job {job_item.id} to {job_key} queue")
 
-                    triggered_jobs.append(job_item)
+                    triggered_jobs.append(job_item.__dict__)
                 else:
                     logger.warning(f"Job {job_key} activated but no SQS URL found in map.")
 
