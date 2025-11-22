@@ -1,9 +1,11 @@
 #!/usr/bin/env python3
-import os
+from dotenv import load_dotenv
 
 import aws_cdk as cdk
 
 from hackaton_platanus.hackaton_platanus_stack import HackatonPlatanusStack
+
+load_dotenv()
 
 app = cdk.App()
 HackatonPlatanusStack(

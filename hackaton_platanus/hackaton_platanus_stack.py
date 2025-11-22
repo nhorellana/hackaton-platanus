@@ -87,7 +87,7 @@ class HackatonPlatanusStack(Stack):
                 "EXTERNAL_RESEARCH_QUEUE_URL": (
                     external_research_queue.queue_url
                 ),
-                "ANTHROPIC_API_KEY": "Llenar con la key"  # Replace with actual key or use Secrets Manager
+                "ANTHROPIC_API_KEY": os.environ['ANTHROPIC_API_KEY']
             }
         )
 
@@ -118,7 +118,7 @@ class HackatonPlatanusStack(Stack):
             layers=[dependencies_layer],
             environment={
                 "JOBS_TABLE_NAME": jobs_table.table_name,
-                "ANTHROPIC_API_KEY": "PLACEHOLDER_ANTHROPIC_API_KEY"
+                "ANTHROPIC_API_KEY": os.environ['ANTHROPIC_API_KEY']
             }
         )
 
@@ -134,7 +134,7 @@ class HackatonPlatanusStack(Stack):
             layers=[dependencies_layer],
             environment={
                 "JOBS_TABLE_NAME": jobs_table.table_name,
-                "ANTHROPIC_API_KEY": "PLACEHOLDER_ANTHROPIC_API_KEY"
+                "ANTHROPIC_API_KEY": os.environ['ANTHROPIC_API_KEY']
             }
         )
 
@@ -150,7 +150,7 @@ class HackatonPlatanusStack(Stack):
             layers=[dependencies_layer],
             environment={
                 "JOBS_TABLE_NAME": jobs_table.table_name,
-                "ANTHROPIC_API_KEY": "PLACEHOLDER_ANTHROPIC_API_KEY"
+                "ANTHROPIC_API_KEY": os.environ['ANTHROPIC_API_KEY']
             }
         )
 
@@ -166,7 +166,7 @@ class HackatonPlatanusStack(Stack):
             layers=[dependencies_layer],
             environment={
                 "JOBS_TABLE_NAME": jobs_table.table_name,
-                "ANTHROPIC_API_KEY": "PLACEHOLDER_ANTHROPIC_API_KEY"
+                "ANTHROPIC_API_KEY": os.environ['ANTHROPIC_API_KEY']
             }
         )
 
@@ -182,7 +182,7 @@ class HackatonPlatanusStack(Stack):
             layers=[dependencies_layer],
             environment={
                 "JOBS_TABLE_NAME": jobs_table.table_name,
-                "ANTHROPIC_API_KEY": "PLACEHOLDER_ANTHROPIC_API_KEY"
+                "ANTHROPIC_API_KEY": os.environ['ANTHROPIC_API_KEY']
             }
         )
 
@@ -209,7 +209,7 @@ class HackatonPlatanusStack(Stack):
                 "SLACK_QUEUE_URL": slack_queue.queue_url,
                 # These should be set via environment variables or AWS Secrets Manager
                 "SLACK_BOT_TOKEN": os.environ.get("SLACK_BOT_TOKEN", ""),
-                "ANTHROPIC_API_KEY": os.environ.get("ANTHROPIC_API_KEY", "")
+                "ANTHROPIC_API_KEY": os.environ['ANTHROPIC_API_KEY']
             }
         )
 
@@ -225,7 +225,7 @@ class HackatonPlatanusStack(Stack):
             layers=[dependencies_layer],
             environment={
                 "JOBS_TABLE_NAME": jobs_table.table_name,
-                "ANTHROPIC_API_KEY": "PLACEHOLDER_ANTHROPIC_API_KEY",
+                "ANTHROPIC_API_KEY": os.environ['ANTHROPIC_API_KEY'],
                 "OBSTACLES_AGENT_NAME": obstacles_agent.function_name,
                 "SOLUTIONS_AGENT_NAME": solutions_agent.function_name,
                 "LEGAL_AGENT_NAME": legal_agent.function_name,
@@ -316,7 +316,8 @@ class HackatonPlatanusStack(Stack):
             description="Chat conversation manager Lambda",
             function_name="chat",
             environment={
-                "CHAT_SESSIONS_TABLE_NAME": chat_sessions_table.table_name
+                "CHAT_SESSIONS_TABLE_NAME": chat_sessions_table.table_name,
+                "ANTHROPIC_API_KEY": os.environ['ANTHROPIC_API_KEY']
             }
         )
 
