@@ -39,6 +39,7 @@ export default function Jobs() {
     });
 
     const [isLoading, setIsLoading] = useState(true);
+    const [isGeneratingSummary, setIsGeneratingSummary] = useState(false);
 
     useEffect(() => {
         if (!sessionId) return;
@@ -60,7 +61,7 @@ export default function Jobs() {
 
         pollJobs();
 
-        const interval = setInterval(pollJobs, 5000);
+        const interval = setInterval(pollJobs, 10000);
 
         return () => clearInterval(interval);
     }, [sessionId]);
@@ -156,6 +157,47 @@ export default function Jobs() {
         return badges[normalizedStatus as keyof typeof badges];
     };
 
+    const parseInstructions = (instructionsStr?: string) => {
+        if (!instructionsStr) return null;
+        try {
+            const parsed = JSON.parse(instructionsStr);
+            return parsed;
+        } catch {
+            return null;
+        }
+    };
+
+    const handleGenerateSummary = async () => {
+        if (!sessionId) return;
+
+        setIsGeneratingSummary(true);
+
+        try {
+            // const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/summary`, {
+            //     method: 'POST',
+            //     headers: {
+            //         'Content-Type': 'application/json',
+            //     },
+            //     body: JSON.stringify({ session_id: sessionId }),
+            // });
+
+            // if (response.ok) {
+            //     const data = await response.json();
+            //     localStorage.setItem('summary-text', data.summary || data.text || '');
+            //     router.push('/summary');
+            // } else {
+            //     console.error('Failed to generate summary');
+            // }
+
+            router.push('/summary');
+
+        } catch (error) {
+            console.error('Error generating summary:', error);
+        } finally {
+            setIsGeneratingSummary(false);
+        }
+    };
+
     return (
         <div className="flex min-h-screen flex-col bg-(--color-background)">
             {/* Header */}
@@ -168,7 +210,13 @@ export default function Jobs() {
                         ← Volver a conversación
                     </button>
                     <h1 className="text-lg font-semibold text-(--color-text)">Servicios de Investigación</h1>
-                    <div className="w-40"></div>
+                    <button
+                        onClick={handleGenerateSummary}
+                        disabled={isGeneratingSummary || jobs.length === 0}
+                        className="cursor-pointer rounded-md bg-(--color-primary) px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-(--color-primary-hover) disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                        {isGeneratingSummary ? 'Generando...' : 'Generar Resumen'}
+                    </button>
                 </div>
             </header>
 
@@ -201,13 +249,18 @@ export default function Jobs() {
                                     ))}
                                 </>
                             ) : (
-                                jobs.map((job) => {
+                                jobs.sort((a, b) => {
+                                    const typeA = a.job_type || a.type || '';
+                                    const typeB = b.job_type || b.type || '';
+                                    return typeA.localeCompare(typeB);
+                                }).map((job) => {
                                     const jobType = job.job_type || job.type;
                                     const jobId = job.id || job.job_id;
                                     if (!jobType) return null;
 
                                     const config = getServiceConfig(jobType);
                                     const statusBadge = getStatusBadge(job.status);
+                                    const instructions = parseInstructions(job.instructions);
 
                                     if (!config || !statusBadge) return null;
 
@@ -228,6 +281,48 @@ export default function Jobs() {
                                                 <h3 className="text-sm font-medium text-(--color-text)">{config.name}</h3>
                                                 <p className="mt-1 text-xs text-(--color-text-secondary)">{config.description}</p>
                                             </div>
+
+                                            {/* Context Summary */}
+                                            {job.context_summary && (
+                                                <div className="mt-2 pt-3 border-t border-(--color-border)">
+                                                    <p className="text-xs text-(--color-text-secondary) leading-relaxed">
+                                                        {job.context_summary}
+                                                    </p>
+                                                </div>
+                                            )}
+
+                                            {/* Instructions */}
+                                            {instructions && instructions.reasoning && (
+                                                <div className="mt-2 pt-3 border-t border-(--color-border)">
+                                                    <p className="text-[10px] font-medium text-(--color-text-secondary) uppercase tracking-wider mb-1">
+                                                        Objetivo
+                                                    </p>
+                                                    <p className="text-xs text-(--color-text) leading-relaxed">
+                                                        {instructions.reasoning}
+                                                    </p>
+                                                </div>
+                                            )}
+
+                                            {/* Queries */}
+                                            {instructions && instructions.queries && instructions.queries.length > 0 && (
+                                                <div className="mt-2">
+                                                    <p className="text-[10px] font-medium text-(--color-text-secondary) uppercase tracking-wider mb-1">
+                                                        Consultas ({instructions.queries.length})
+                                                    </p>
+                                                    <div className="space-y-1">
+                                                        {instructions.queries.slice(0, 2).map((query: string, idx: number) => (
+                                                            <p key={idx} className="text-xs text-(--color-text-secondary) leading-relaxed truncate">
+                                                                • {query}
+                                                            </p>
+                                                        ))}
+                                                        {instructions.queries.length > 2 && (
+                                                            <p className="text-xs text-(--color-text-secondary) italic">
+                                                                +{instructions.queries.length - 2} más...
+                                                            </p>
+                                                        )}
+                                                    </div>
+                                                </div>
+                                            )}
                                         </div>
                                     );
                                 })
