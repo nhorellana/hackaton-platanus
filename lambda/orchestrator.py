@@ -8,6 +8,8 @@ import time
 from datetime import datetime
 from typing import Dict, Any, List
 
+import boto3
+
 logger = logging.getLogger()
 logger.setLevel(logging.INFO)
 
@@ -21,14 +23,14 @@ BACKOFF_MAX_RETRIES = 5
 BASE_DELAY = 1.0
 
 # Initialize AWS clients
-dynamodb = boto3.resource('dynamodb')
-sqs = boto3.client('sqs')
+dynamodb = boto3.resource("dynamodb")
+sqs = boto3.client("sqs")
 
 # Get environment variables
-JOBS_TABLE_NAME = os.environ.get('JOBS_TABLE_NAME', 'jobs')
-SLACK_QUEUE_URL = os.environ.get('SLACK_QUEUE_URL', 'slack')  # Mapped to ADI (Internal Contacts)
-MARKET_RESEARCH_QUEUE_URL = os.environ.get('MARKET_RESEARCH_QUEUE_URL', 'market_research')  # Mapped to ECG (Market Context)
-EXTERNAL_RESEARCH_QUEUE_URL = os.environ.get('EXTERNAL_RESEARCH_QUEUE_URL', 'external_research')  # Mapped to VEE (External Experts)
+JOBS_TABLE_NAME = os.environ["JOBS_TABLE_NAME"]
+SLACK_QUEUE_URL = os.environ["SLACK_QUEUE_URL"]
+MARKET_RESEARCH_QUEUE_URL = os.environ["MARKET_RESEARCH_QUEUE_URL"]
+EXTERNAL_RESEARCH_QUEUE_URL = os.environ["EXTERNAL_RESEARCH_QUEUE_URL"]
 
 # Get table reference
 jobs_table = dynamodb.Table(JOBS_TABLE_NAME)
