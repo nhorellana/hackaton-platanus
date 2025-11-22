@@ -16,6 +16,8 @@ export default function Conversation() {
     const [inputValue, setInputValue] = useState("");
     const [isLoading, setIsLoading] = useState(false);
     const [sessionId, setSessionId] = useState<string | null>(null);
+    const [showModal, setShowModal] = useState(false);
+    const [synthesisMessage, setSynthesisMessage] = useState("");
     const messagesEndRef = useRef<HTMLDivElement>(null);
     const hasInitialized = useRef(false);
 
@@ -91,6 +93,7 @@ export default function Conversation() {
                 console.error('Error loading messages:', error);
             }
         }
+        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
 
     useEffect(() => {
@@ -121,15 +124,58 @@ export default function Conversation() {
         localStorage.removeItem('conversation-session-id');
     };
 
+    const handleSynthesizeConversation = async () => {
+        const synthesisPrompt = "Sintetiza esta conversación y dame el problema de fondo";
+        setIsLoading(true);
+
+        try {
+            const requestBody: { message: string; session_id?: string } = { message: synthesisPrompt };
+            if (sessionId) {
+                requestBody.session_id = sessionId;
+            }
+
+            const response = await fetch(`${API_URL}/chat`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify(requestBody),
+            });
+
+            if (!response.ok) {
+                throw new Error('Failed to get response');
+            }
+
+            const data = await response.json();
+            setSynthesisMessage(data.message || 'No se recibió respuesta del servidor.');
+            setShowModal(true);
+        } catch (error) {
+            console.error('Error synthesizing conversation:', error);
+            setSynthesisMessage('Error al conectar con el servidor. Por favor intenta de nuevo.');
+            setShowModal(true);
+        } finally {
+            setIsLoading(false);
+        }
+    };
+
     const handleCreateJobs = async () => {
         try {
+            const lastAssistantMessage = [...messages].reverse().find(msg => msg.role === 'assistant');
+            const problemDeclaration = synthesisMessage || lastAssistantMessage?.content || '';
+
+            const controller = new AbortController();
+            const timeoutId = setTimeout(() => controller.abort(), 900000);
+
             const response = await fetch(`${API_URL}/jobs`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
                 },
-                body: JSON.stringify({ message: messages[0]?.content || '' }),
+                body: JSON.stringify({ full_problem_declaration: problemDeclaration }),
+                signal: controller.signal,
             });
+
+            clearTimeout(timeoutId);
 
             if (response.ok) {
                 const data = await response.json();
@@ -213,13 +259,14 @@ export default function Conversation() {
                 </div>
             </div>
 
-            <button
+            {messages.length > 10 && (<button
                 type="button"
-                className="w-64 mb-8 mx-auto rounded-md bg-(--color-primary) px-6 py-2 text-sm font-medium text-white transition-colors hover:bg-(--color-primary-hover) disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
-                onClick={handleCreateJobs}
+                className="w-72 mb-8 mx-auto rounded-md bg-(--color-primary) px-6 py-2 text-sm font-medium text-white transition-colors hover:bg-(--color-primary-hover) disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
+                onClick={handleSynthesizeConversation}
+                disabled={isLoading}
             >
-                Encontré el problema
-            </button>
+                Ayudame a encontrar el problema
+            </button>)}
 
             {/* Input Container */}
             <div className="border-t border-(--color-border) bg-(--color-background) px-4 py-6">
@@ -245,6 +292,34 @@ export default function Conversation() {
                     </form>
                 </div>
             </div>
+
+            {/* Synthesis Modal */}
+            {showModal && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50">
+                    <div className="mx-4 max-w-2xl rounded-lg border border-(--color-border) bg-(--color-background) p-8 shadow-xl">
+                        <h2 className="mb-4 text-xl font-semibold text-(--color-text)">Síntesis de la Conversación</h2>
+                        <div className="mb-6 max-h-96 overflow-y-auto rounded-lg border border-(--color-border) bg-(--color-input-bg) p-4">
+                            <p className="whitespace-pre-wrap text-sm leading-relaxed text-(--color-text)">
+                                {synthesisMessage}
+                            </p>
+                        </div>
+                        <div className="flex justify-end space-x-4">
+                            <button
+                                onClick={() => setShowModal(false)}
+                                className="cursor-pointer rounded-md border border-(--color-border) px-6 py-2 text-sm font-medium text-(--color-text) transition-colors hover:bg-(--color-input-bg)"
+                            >
+                                Cancelar
+                            </button>
+                            <button
+                                onClick={handleCreateJobs}
+                                className="cursor-pointer rounded-md bg-(--color-primary) px-6 py-2 text-sm font-medium text-white transition-colors hover:bg-(--color-primary-hover)"
+                            >
+                                Continuar
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     );
 }
