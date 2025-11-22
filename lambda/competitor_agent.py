@@ -35,7 +35,7 @@ def handler(event, context):
     try:
         # Parse input
         job_id = event["job_id"]
-        problem_context = event["problem_context"]
+        instructions = event.get("instructions", event.get("problem_context", ""))
         obstacles_findings = event.get("obstacles_findings", {})
         solutions_findings = event.get("solutions_findings", {})
         legal_findings = event.get("legal_findings", {})
@@ -55,7 +55,7 @@ def handler(event, context):
 
         # Run agent with Claude
         result = run_competitor_analysis(
-            problem_context, obstacles_findings, solutions_findings, legal_findings
+            instructions, obstacles_findings, solutions_findings, legal_findings
         )
 
         # Save findings to DynamoDB
@@ -106,66 +106,139 @@ def run_competitor_analysis(
     """
     Analyze competitive landscape using Claude with web search.
     """
-    system_prompt = """You are an expert competitive intelligence analyst specializing in market analysis.
+    system_prompt = """You are an expert competitive intelligence analyst specializing in market analysis. Your research will inform multi-million dollar go/no-go decisions for institutional investors.
 
-Your role is to research and identify:
+CITATION REQUIREMENTS - CRITICAL:
+Your findings MUST be backed by credible, verifiable sources with complete citation information. Prioritize:
+1. Company financial data - Crunchbase, PitchBook, SEC filings, company investor relations
+2. Industry analyst reports - Gartner, Forrester, IDC market analyses
+3. Major business publications - Bloomberg, WSJ, Financial Times, Forbes
+4. Market research firms - Statista, eMarketer, CB Insights
+5. Company websites - official product pages, about pages, pricing
+6. Tech news - TechCrunch, The Information, VentureBeat (for recent developments)
+
+For EVERY competitor, market assessment, or barrier identified, you must provide detailed citations including:
+- Full URL to verifiable source
+- Source title and publication
+- Organization publishing the data
+- Publication/update date
+- Specific data point, quote, or metric
+- Explanation of how this validates the finding
+
+AVOID: Speculation without evidence, outdated information, unverified claims, anonymous sources.
+
+Your role is to identify:
 1. Direct competitors - companies/products solving the exact same problem
 2. Indirect competitors - alternative solutions or substitute products
-3. Market structure - is it monopolistic, oligopolistic, fragmented, or emerging?
-4. Entry barriers - what makes it hard for new entrants to compete?
-5. White space opportunities - underserved segments or gaps in the market
+3. Market structure - monopolistic, oligopolistic, fragmented, or emerging
+4. Entry barriers - what makes it hard for new entrants to compete
+5. White space opportunities - underserved segments or gaps
 
-For each competitor category, provide:
-- Company/product names with URLs
-- Their approach and value proposition
-- Strengths and weaknesses
-- Market position (leader, challenger, niche)
-- Funding/revenue (if available)
-- Recent developments or news
+For each finding, provide:
+- Verifiable company/product names with official sources
+- Evidence-based market positioning
+- Documented strengths and weaknesses (from reviews, reports)
+- Verified funding/revenue data with dates
+- Recent developments with news citations
 
-Use web_search and web_fetch to find:
-- Current players in the market
-- Recent funding announcements
-- Product launches and features
-- Market share data
-- Customer reviews and sentiment
-- Industry reports and analysis
+Use web_search and web_fetch extensively to find authoritative information.
 
 Output your findings as a JSON object with this structure:
 {
   "direct_competitors": [
     {
-      "name": "...",
-      "url": "...",
-      "description": "...",
-      "strengths": ["..."],
-      "weaknesses": ["..."],
-      "market_position": "...",
-      "funding": "..."
+      "name": "Company/Product Name",
+      "company_legal_name": "Official legal entity name",
+      "url": "Official website",
+      "founded": "Year founded",
+      "headquarters": "Location",
+      "description": "What they do",
+      "value_proposition": "Their key differentiation",
+      "strengths": [
+        {"strength": "Specific advantage", "evidence": "Supporting data", "citation_ids": ["cite_1"]}
+      ],
+      "weaknesses": [
+        {"weakness": "Specific limitation", "evidence": "Supporting data", "citation_ids": ["cite_1"]}
+      ],
+      "market_position": "leader|challenger|niche|emerging",
+      "funding": {
+        "total_raised": "Amount in USD",
+        "last_round": "Series X, $Y, Date",
+        "investors": ["Investor names"],
+        "citation_ids": ["cite_1"]
+      },
+      "revenue": {
+        "amount": "Reported revenue if available",
+        "year": "Fiscal year",
+        "growth_rate": "YoY growth if available",
+        "citation_ids": ["cite_1"]
+      },
+      "customer_base": "Known customer count or scale",
+      "recent_developments": [
+        {"development": "What happened", "date": "When", "citation_ids": ["cite_1"]}
+      ],
+      "citation_ids": ["cite_1", "cite_2"]
     }
   ],
   "indirect_competitors": [
     {
-      "name": "...",
-      "type": "substitute|alternative",
-      "description": "...",
-      "why_competitive": "..."
+      "name": "Company/Product Name",
+      "type": "substitute|alternative|adjacent",
+      "description": "What they do",
+      "why_competitive": "How they compete indirectly",
+      "market_overlap": "Degree of overlap",
+      "citation_ids": ["cite_1"]
     }
   ],
   "market_structure": {
     "type": "monopolistic|oligopolistic|fragmented|emerging",
-    "description": "...",
-    "key_players": ["..."]
+    "description": "Market dynamics explanation",
+    "concentration": "Market share distribution",
+    "key_players": [
+      {"name": "Player name", "estimated_share": "Market share if available", "citation_ids": ["cite_1"]}
+    ],
+    "trends": ["Key market trends with evidence"],
+    "citation_ids": ["cite_1"]
   },
   "barriers": [
     {
-      "type": "brand|network|technology|regulatory|capital",
-      "description": "...",
-      "severity": "high|medium|low"
+      "type": "brand|network_effect|technology|regulatory|capital|distribution|data",
+      "description": "Specific barrier description",
+      "severity": "high|medium|low",
+      "evidence": "Why this is a barrier",
+      "affected_entrants": "Who this impacts",
+      "citation_ids": ["cite_1"]
     }
   ],
-  "white_space": ["opportunity 1", "opportunity 2", ...],
-  "sources": ["url 1", "url 2", ...]
+  "white_space": [
+    {
+      "opportunity": "Underserved segment or gap",
+      "description": "What's missing",
+      "evidence": "Proof this gap exists",
+      "potential_size": "Estimated opportunity if quantifiable",
+      "citation_ids": ["cite_1"]
+    }
+  ],
+  "competitive_intensity": {
+    "level": "high|medium|low",
+    "factors": ["Key factors driving competition"],
+    "citation_ids": ["cite_1"]
+  },
+  "citations": [
+    {
+      "id": "cite_1",
+      "url": "https://...",
+      "title": "Article/Report/Page Title",
+      "source_organization": "Publishing Organization",
+      "source_type": "financial_data|analyst_report|news|company_website|market_research",
+      "date_published": "YYYY-MM-DD or null",
+      "date_accessed": "YYYY-MM-DD",
+      "author": "Author Name or null",
+      "excerpt": "Relevant data point, quote, or metric",
+      "relevance": "How this supports the finding",
+      "credibility_indicators": "Why this source is trustworthy"
+    }
+  ]
 }"""
 
     previous_context = f"""
@@ -184,14 +257,29 @@ PREVIOUS FINDINGS - LEGAL:
 
 {previous_context}
 
-Given the problem and previous research, please analyze the competitive landscape. Use web search to find:
-- Direct and indirect competitors
-- Market structure and dynamics
-- Entry barriers and moats
-- Opportunities and white space
-- Recent competitive developments
+Given the problem and previous research, please analyze the competitive landscape.
 
-Provide detailed, current information with sources."""
+RESEARCH REQUIREMENTS:
+Use web_search and web_fetch extensively to gather authoritative competitive intelligence:
+- Company financial databases (Crunchbase, PitchBook) for funding and metrics
+- Industry analyst reports for market positioning and trends
+- Business publications for recent news and developments
+- Company websites for product details and official information
+- Market research reports for market structure and sizing
+- SEC filings and investor relations pages for public companies
+- Product review sites for customer feedback and positioning
+
+Focus on:
+- Named competitors with verified company details
+- Quantified market shares where available (with sources)
+- Documented funding rounds with amounts and dates
+- Specific product strengths/weaknesses backed by reviews or reports
+- Identified entry barriers with evidence
+- White space opportunities with market data support
+
+CRITICAL: Every competitor, market metric, funding figure, and competitive assessment must be linked to credible citations. Cite multiple sources for key claims. Include both company official sources AND third-party validation. Do not estimate or speculate without clearly labeling it as such.
+
+Today's date is {datetime.utcnow().strftime("%Y-%m-%d")} - use this for date_accessed in citations."""
 
     logger.info("Calling Claude API for competitor analysis...")
 
@@ -267,7 +355,8 @@ def extract_json_from_response(response):
         "market_structure": {},
         "barriers": [],
         "white_space": [],
-        "sources": [],
-        "raw_response": text_content,
+        "competitive_intensity": {},
+        "citations": [],
+        "raw_response": text_content[:1000],
         "parse_error": "Could not parse structured JSON from response",
     }

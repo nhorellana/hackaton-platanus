@@ -35,7 +35,7 @@ def handler(event, context):
     try:
         # Parse input
         job_id = event["job_id"]
-        problem_context = event["problem_context"]
+        instructions = event.get("instructions", event.get("problem_context", ""))
         obstacles_findings = event.get("obstacles_findings", {})
         solutions_findings = event.get("solutions_findings", {})
 
@@ -53,7 +53,7 @@ def handler(event, context):
         )
 
         # Run agent with Claude
-        result = run_legal_analysis(problem_context, obstacles_findings, solutions_findings)
+        result = run_legal_analysis(instructions, obstacles_findings, solutions_findings)
 
         # Save findings to DynamoDB
         jobs_table.update_item(
@@ -101,9 +101,29 @@ def run_legal_analysis(problem_context, obstacles_findings, solutions_findings):
     """
     Analyze legal and regulatory requirements using Claude with web search.
     """
-    system_prompt = """You are an expert legal and regulatory analyst specializing in compliance requirements for new businesses and products.
+    system_prompt = """You are an expert legal and regulatory analyst specializing in compliance requirements for new businesses and products. Your research will inform multi-million dollar go/no-go decisions for institutional investors.
 
-Your role is to research and identify:
+CITATION REQUIREMENTS - CRITICAL:
+Your findings MUST be backed by authoritative legal and regulatory sources with complete citation information. Prioritize:
+1. Government regulatory websites (.gov domains) - official regulations, guidance documents
+2. Official legal databases - regulations.gov, EUR-Lex, official gazettes
+3. Regulatory body publications - SEC, FTC, FDA, FCC, state agencies
+4. Legal analysis from major law firms - compliance guides, legal updates
+5. Industry compliance resources - official industry association guidance
+6. Official legal texts - statutes, codes, directives with section numbers
+
+For EVERY regulatory requirement, you must provide detailed citations including:
+- Full URL to official source
+- Official name of regulation/law with section numbers
+- Regulatory authority/issuing body
+- Date of enactment/most recent update
+- Specific compliance requirement text or excerpt
+- Jurisdiction and applicability
+- Explanation of relevance
+
+AVOID: Unofficial interpretations, blog posts, outdated information, secondary sources without primary citation.
+
+Your role is to identify:
 1. Industry-specific regulations - sector-specific laws and compliance requirements
 2. Data protection - GDPR, CCPA, data privacy laws
 3. Financial regulations - payment processing, money transmission, securities laws
@@ -111,33 +131,87 @@ Your role is to research and identify:
 5. Licensing and certification requirements
 
 For each regulatory category, provide:
-- Specific regulations and laws (with official names/codes)
-- Jurisdictions where they apply
-- Compliance requirements and steps
-- Potential penalties for non-compliance
-- Timeline and complexity for compliance
+- Specific regulations with official names and codes
+- Exact jurisdictions and applicability criteria
+- Detailed compliance requirements with legal citations
+- Specific penalties for non-compliance (with legal basis)
+- Implementation timeline and complexity assessment
+- Links to official regulatory guidance
 
-Use web_search to find:
-- Current regulations and recent changes
-- Industry-specific compliance requirements
-- Regulatory bodies and authorities
-- Real examples of compliance issues from similar products
+Use web_search to find authoritative sources.
 
 Output your findings as a JSON object with this structure:
 {
   "industry_regulations": [
-    {"regulation": "...", "jurisdiction": "...", "requirements": "...", "complexity": "high|medium|low"}
+    {
+      "regulation_name": "Official regulation name with code/section",
+      "regulatory_body": "Issuing authority",
+      "jurisdiction": "Specific jurisdiction(s)",
+      "requirements": "Detailed compliance requirements",
+      "applicability": "When/how this applies",
+      "complexity": "high|medium|low",
+      "implementation_timeline": "Estimated time to comply",
+      "citation_ids": ["cite_1", "cite_2"]
+    }
   ],
   "data_protection": [
-    {"law": "...", "jurisdiction": "...", "key_requirements": "...", "penalties": "..."}
+    {
+      "law_name": "Official law name (e.g., GDPR Article 6)",
+      "jurisdiction": "Geographic scope",
+      "key_requirements": "Specific obligations",
+      "applicability_threshold": "When this applies",
+      "penalties": "Specific penalty amounts/structure",
+      "compliance_steps": "Key actions required",
+      "citation_ids": ["cite_1"]
+    }
   ],
   "financial_regs": [
-    {"regulation": "...", "applies_if": "...", "requirements": "..."}
+    {
+      "regulation_name": "Official name with code",
+      "regulatory_body": "Governing authority",
+      "applies_if": "Triggering conditions",
+      "requirements": "Specific obligations",
+      "licensing_needed": "Required licenses/registrations",
+      "citation_ids": ["cite_1"]
+    }
   ],
   "regional_variations": [
-    {"region": "...", "specific_requirements": "...", "difficulty": "..."}
+    {
+      "region": "Specific jurisdiction",
+      "unique_requirements": "Requirements specific to this region",
+      "differences_from_baseline": "How this differs",
+      "difficulty": "high|medium|low",
+      "citation_ids": ["cite_1"]
+    }
   ],
-  "sources": ["url 1", "url 2", ...]
+  "licensing_requirements": [
+    {
+      "license_type": "Type of license/certification",
+      "issuing_authority": "Who grants this",
+      "requirements": "How to obtain",
+      "timeline": "Processing time",
+      "cost_range": "Estimated costs",
+      "renewal": "Renewal requirements",
+      "citation_ids": ["cite_1"]
+    }
+  ],
+  "citations": [
+    {
+      "id": "cite_1",
+      "url": "https://...",
+      "title": "Regulation/Law Name and Section",
+      "source_organization": "Regulatory Body",
+      "source_type": "government|legal_database|regulatory_body|law_firm|industry_association",
+      "regulation_code": "Official code/section number",
+      "date_enacted": "YYYY-MM-DD",
+      "date_last_updated": "YYYY-MM-DD",
+      "date_accessed": "YYYY-MM-DD",
+      "excerpt": "Relevant legal text or compliance requirement",
+      "jurisdiction": "Applicable jurisdiction(s)",
+      "relevance": "How this citation supports the finding",
+      "credibility_indicators": "Official status, authority basis"
+    }
+  ]
 }"""
 
     previous_context = f"""
@@ -153,14 +227,28 @@ PREVIOUS FINDINGS - SOLUTIONS:
 
 {previous_context}
 
-Given the problem and previous research, please analyze the legal and regulatory landscape. Use web search to find:
-- Relevant industry regulations
-- Data protection and privacy requirements
-- Financial/payment regulations (if applicable)
-- Licensing or certification needs
-- Regional differences in regulations
+Given the problem and previous research, please analyze the legal and regulatory landscape.
 
-Provide specific, actionable information with sources."""
+RESEARCH REQUIREMENTS:
+Use web_search to find authoritative legal and regulatory sources:
+- Official government regulatory websites and databases
+- Specific statutes, regulations, and legal codes (with section numbers)
+- Regulatory body guidance documents and official interpretations
+- Major law firm compliance analyses (to supplement official sources)
+- Industry association compliance resources
+- Recent regulatory changes and enforcement actions
+
+Focus on:
+- Exact regulatory requirements with official citations
+- Specific jurisdictions and applicability criteria
+- Concrete compliance steps with legal basis
+- Documented penalties with legal references
+- Timeline and cost estimates for compliance
+- Regional regulatory variations
+
+CRITICAL: Every regulatory requirement, penalty, and compliance obligation must be linked to an official legal source. Cite both the primary legal text AND any official guidance documents. Include regulation codes, section numbers, and dates. Do not describe legal requirements without official citations.
+
+Today's date is {datetime.utcnow().strftime("%Y-%m-%d")} - use this for date_accessed in citations."""
 
     logger.info("Calling Claude API for legal analysis...")
 
@@ -226,7 +314,8 @@ def extract_json_from_response(response):
         "data_protection": [],
         "financial_regs": [],
         "regional_variations": [],
-        "sources": [],
-        "raw_response": text_content,
+        "licensing_requirements": [],
+        "citations": [],
+        "raw_response": text_content[:1000],
         "parse_error": "Could not parse structured JSON from response",
     }

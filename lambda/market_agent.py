@@ -35,7 +35,7 @@ def handler(event, context):
     try:
         # Parse input
         job_id = event["job_id"]
-        problem_context = event["problem_context"]
+        instructions = event.get("instructions", event.get("problem_context", ""))
         obstacles_findings = event.get("obstacles_findings", {})
         solutions_findings = event.get("solutions_findings", {})
         legal_findings = event.get("legal_findings", {})
@@ -56,7 +56,7 @@ def handler(event, context):
 
         # Run agent with Claude
         result = run_market_analysis(
-            problem_context,
+            instructions,
             obstacles_findings,
             solutions_findings,
             legal_findings,
@@ -111,59 +111,176 @@ def run_market_analysis(
     """
     Analyze market dynamics using Claude with web search.
     """
-    system_prompt = """You are an expert market analyst specializing in market sizing, trends, and customer analysis.
+    system_prompt = """You are an expert market analyst specializing in market sizing, trends, and customer analysis. Your research will inform multi-million dollar go/no-go decisions for institutional investors.
+
+CITATION REQUIREMENTS - CRITICAL:
+Your findings MUST be backed by credible, verifiable market data sources with complete citation information. Prioritize:
+1. Market research firms - Gartner, Forrester, IDC, Statista, eMarketer, Grand View Research
+2. Industry associations - official trade association reports and statistics
+3. Government data - Census Bureau, Bureau of Labor Statistics, industry regulators
+4. Financial research - Goldman Sachs, Morgan Stanley, McKinsey sector reports
+5. Public company data - SEC filings, earnings calls, investor presentations
+6. Academic research - university studies, peer-reviewed market analyses
+
+For EVERY market metric, growth rate, segment size, or pricing data point, you must provide detailed citations including:
+- Full URL to verifiable source
+- Report title and publication
+- Publishing organization
+- Publication/report date
+- Specific figure, metric, or data point
+- Methodology or basis for the figure
+- Geographic scope and time period
+
+AVOID: Unsubstantiated estimates, blog posts, marketing materials without data, outdated reports (>2 years old unless historical context).
 
 Your role is to research and quantify:
-1. Market size - TAM (Total Addressable Market), SAM (Serviceable Addressable Market), SOM (Serviceable Obtainable Market)
-2. Growth trends - historical growth rates, projections, driving factors
-3. Customer segments - who are the buyers, their characteristics, needs, and behaviors
-4. Pricing benchmarks - what similar products cost, pricing models, willingness to pay
+1. Market size - TAM, SAM, SOM with clear methodology
+2. Growth trends - historical rates, projections with evidence
+3. Customer segments - quantified segments with characteristics
+4. Pricing benchmarks - verified pricing with sources
 
-For each area, provide:
-- Specific numbers and data points with sources
-- Geographic breakdown (global vs regional)
-- Time-based trends (historical and projected)
-- Supporting evidence and methodology
+For each finding, provide:
+- Specific quantified metrics (no vague terms like "large" or "growing rapidly")
+- Clear geographic scope (Global, US, EU, etc.)
+- Time period and date of data
+- Calculation methodology where relevant
+- Source credibility assessment
 
-Use web_search to find:
-- Market research reports and industry analyses
-- Company financials and metrics
-- Customer surveys and reviews
-- Pricing information from competitor websites
-- Industry publications and statistics
+Use web_search extensively to find authoritative market data.
 
 Output your findings as a JSON object with this structure:
 {
   "market_size": {
-    "tam": {"value": "...", "unit": "USD|users|...", "year": "...", "source": "..."},
-    "sam": {"value": "...", "unit": "...", "year": "...", "methodology": "..."},
-    "som": {"value": "...", "unit": "...", "year": "...", "assumptions": "..."}
+    "tam": {
+      "value": "Specific number",
+      "unit": "USD|units|users",
+      "year": "YYYY",
+      "geography": "Geographic scope",
+      "methodology": "How this was calculated",
+      "growth_rate": "CAGR % if available",
+      "citation_ids": ["cite_1"]
+    },
+    "sam": {
+      "value": "Specific number",
+      "unit": "USD|units|users",
+      "year": "YYYY",
+      "geography": "Geographic scope",
+      "methodology": "How this narrows from TAM",
+      "citation_ids": ["cite_1"]
+    },
+    "som": {
+      "value": "Specific number",
+      "unit": "USD|units|users",
+      "year": "YYYY",
+      "geography": "Geographic scope",
+      "assumptions": "Realistic capture assumptions",
+      "methodology": "How this was calculated",
+      "citation_ids": ["cite_1"]
+    }
   },
   "growth_trends": {
-    "historical_cagr": "...",
-    "projected_cagr": "...",
-    "time_period": "...",
-    "drivers": ["driver 1", "driver 2", ...],
-    "headwinds": ["headwind 1", "headwind 2", ...]
+    "historical": {
+      "cagr": "X.X%",
+      "time_period": "YYYY-YYYY",
+      "key_milestones": ["Milestone with year"],
+      "citation_ids": ["cite_1"]
+    },
+    "projected": {
+      "cagr": "X.X%",
+      "time_period": "YYYY-YYYY",
+      "confidence": "high|medium|low",
+      "citation_ids": ["cite_1"]
+    },
+    "drivers": [
+      {"driver": "Growth driver", "impact": "Quantified impact if available", "citation_ids": ["cite_1"]}
+    ],
+    "headwinds": [
+      {"headwind": "Challenge", "impact": "Quantified impact if available", "citation_ids": ["cite_1"]}
+    ]
   },
   "customer_segments": [
     {
-      "segment": "...",
-      "size": "...",
-      "characteristics": "...",
-      "needs": ["..."],
-      "buying_behavior": "..."
+      "segment_name": "Segment identifier",
+      "size": {
+        "value": "Specific number",
+        "unit": "USD|users|companies",
+        "percentage_of_market": "X%",
+        "citation_ids": ["cite_1"]
+      },
+      "characteristics": {
+        "demographics": "Key demographic info",
+        "firmographics": "Company characteristics if B2B",
+        "psychographics": "Behaviors and preferences"
+      },
+      "needs": ["Specific need 1", "Specific need 2"],
+      "buying_behavior": {
+        "decision_criteria": ["What drives purchase"],
+        "typical_budget": "Budget range if available",
+        "purchase_cycle": "Timeframe",
+        "decision_makers": "Who buys"
+      },
+      "willingness_to_pay": {
+        "range": "Price range",
+        "evidence": "Source of this information",
+        "citation_ids": ["cite_1"]
+      },
+      "citation_ids": ["cite_1"]
     }
   ],
   "pricing_benchmarks": {
-    "range": "...",
-    "average": "...",
-    "models": ["subscription", "one-time", "usage-based", ...],
+    "range": {
+      "low": "Minimum price",
+      "high": "Maximum price",
+      "currency": "USD",
+      "unit": "per month|per user|etc."
+    },
+    "average": {
+      "value": "Average price",
+      "basis": "How calculated"
+    },
+    "models": [
+      {
+        "model_type": "subscription|one-time|usage-based|freemium|tiered",
+        "prevalence": "How common",
+        "examples": ["Company names using this model"]
+      }
+    ],
     "examples": [
-      {"product": "...", "price": "...", "model": "..."}
-    ]
+      {
+        "product": "Product name",
+        "company": "Company name",
+        "price": "Specific price",
+        "model": "Pricing model",
+        "features": "What's included",
+        "citation_ids": ["cite_1"]
+      }
+    ],
+    "citation_ids": ["cite_1"]
   },
-  "sources": ["url 1", "url 2", ...]
+  "market_dynamics": {
+    "maturity": "emerging|growth|mature|declining",
+    "seasonality": "Any seasonal patterns",
+    "key_trends": ["Trend 1", "Trend 2"],
+    "citation_ids": ["cite_1"]
+  },
+  "citations": [
+    {
+      "id": "cite_1",
+      "url": "https://...",
+      "title": "Report/Article Title",
+      "source_organization": "Research Firm/Publisher",
+      "source_type": "market_research|government|financial_research|industry_association|academic|company_filing",
+      "report_date": "YYYY-MM-DD",
+      "date_accessed": "YYYY-MM-DD",
+      "author": "Author/Analyst Name or null",
+      "excerpt": "Specific data point or quote with numbers",
+      "methodology": "How the data was gathered/calculated",
+      "sample_size": "If survey/research based",
+      "geographic_scope": "Geographic coverage",
+      "relevance": "How this supports the finding",
+      "credibility_indicators": "Why this source is authoritative"
+    }
+  ]
 }"""
 
     previous_context = f"""
@@ -185,14 +302,30 @@ PREVIOUS FINDINGS - COMPETITORS:
 
 {previous_context}
 
-Given the problem and all previous research, please analyze the market dynamics. Use web search to find:
-- Market size data and projections
-- Growth rates and trends
-- Customer segments and characteristics
-- Pricing benchmarks and models
-- Industry reports and statistics
+Given the problem and all previous research, please analyze the market dynamics.
 
-Focus on quantitative data with clear sources. Be specific with numbers, time periods, and geographies."""
+RESEARCH REQUIREMENTS:
+Use web_search extensively to gather authoritative market data:
+- Market research reports (Gartner, Forrester, Statista, IDC, Grand View Research)
+- Industry association statistics and reports
+- Government economic data and census information
+- Financial analyst reports and sector analyses
+- Public company filings (10-K, earnings transcripts, investor presentations)
+- Academic market research and peer-reviewed studies
+- Verified pricing from company websites and review platforms
+
+Focus on:
+- Specific market size figures with TAM/SAM/SOM methodology
+- Quantified growth rates (historical and projected CAGR) with timeframes
+- Customer segment sizes with demographic/firmographic data
+- Documented pricing with multiple examples and sources
+- Market trends backed by data, not opinions
+
+CRITICAL: Every market figure, growth rate, segment size, and pricing data point must be linked to credible citations. For market sizing, cite the methodology used. For growth projections, cite the basis for the forecast. For segment data, cite the research methodology. Include both primary research sources AND any available validation sources.
+
+Avoid estimates unless clearly labeled. When data is unavailable, state "Data not publicly available" rather than guessing.
+
+Today's date is {datetime.utcnow().strftime("%Y-%m-%d")} - use this for date_accessed in citations. Prioritize recent data (within 2 years) for current market conditions."""
 
     logger.info("Calling Claude API for market analysis...")
 
@@ -258,7 +391,8 @@ def extract_json_from_response(response):
         "growth_trends": {},
         "customer_segments": [],
         "pricing_benchmarks": {},
-        "sources": [],
-        "raw_response": text_content,
+        "market_dynamics": {},
+        "citations": [],
+        "raw_response": text_content[:1000],
         "parse_error": "Could not parse structured JSON from response",
     }

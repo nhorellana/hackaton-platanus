@@ -35,7 +35,7 @@ def handler(event, context):
     try:
         # Parse input
         job_id = event["job_id"]
-        problem_context = event["problem_context"]
+        instructions = event.get("instructions", event.get("problem_context", ""))
 
         logger.info(f"Processing Obstacles Agent for job {job_id}")
 
@@ -51,7 +51,7 @@ def handler(event, context):
         )
 
         # Run agent with Claude
-        result = run_obstacles_analysis(problem_context)
+        result = run_obstacles_analysis(instructions)
 
         # Save findings to DynamoDB
         jobs_table.update_item(
@@ -99,44 +99,103 @@ def run_obstacles_analysis(problem_context):
     """
     Analyze obstacles using Claude with web search tools.
     """
-    system_prompt = """You are an expert analyst identifying obstacles and challenges for new business ideas or products.
+    system_prompt = """You are an expert analyst identifying obstacles and challenges for new business ideas or products. Your research will inform multi-million dollar go/no-go decisions for institutional investors.
 
-Your role is to conduct comprehensive research and identify:
+CITATION REQUIREMENTS - CRITICAL:
+Your findings MUST be backed by credible, verifiable sources with complete citation information. Prioritize:
+1. Government sources (.gov domains) - regulatory data, statistics
+2. Academic research (.edu domains) - peer-reviewed studies
+3. Industry reports - Gartner, McKinsey, Forrester, IDC
+4. Major publications - WSJ, NYT, Bloomberg, Reuters, Financial Times
+5. Company financial filings - 10-K, annual reports, investor presentations
+
+For EVERY finding, you must provide detailed citations including:
+- Full URL (must be accessible)
+- Source title/article headline
+- Publishing organization
+- Publication date (if available)
+- Author (if available)
+- Specific excerpt or data point used
+- Explanation of how this source supports the finding
+
+AVOID: Blog posts, social media, Wikipedia, promotional content, anonymous sources.
+
+Your role is to identify:
 1. Technical obstacles - technology limitations, implementation challenges, scalability issues
 2. Market obstacles - market maturity, timing issues, customer adoption barriers
 3. Regulatory obstacles - compliance requirements, legal restrictions, licensing needs
 4. User obstacles - user behavior challenges, adoption friction, education needs
 5. Financial obstacles - cost barriers, funding challenges, pricing difficulties
 
-For each obstacle category, provide:
-- Specific, concrete obstacles (not generic)
+For each obstacle, provide:
+- Specific, concrete description
 - Severity assessment (critical, high, medium, low)
-- Evidence and sources to support your findings
+- Supporting evidence from credible sources
+- Citation linking the obstacle to the source
 
-Use web_search to find recent information about similar products/markets and their challenges.
+Use web_search extensively to find recent, authoritative information.
 
 Output your findings as a JSON object with this structure:
 {
-  "technical": ["obstacle 1", "obstacle 2", ...],
-  "market": ["obstacle 1", "obstacle 2", ...],
-  "regulatory": ["obstacle 1", "obstacle 2", ...],
-  "user": ["obstacle 1", "obstacle 2", ...],
-  "financial": ["obstacle 1", "obstacle 2", ...],
-  "critical_insights": ["key insight 1", "key insight 2", ...],
-  "sources": ["url 1", "url 2", ...]
+  "technical": [
+    {
+      "obstacle": "Detailed description of obstacle",
+      "severity": "critical|high|medium|low",
+      "evidence": "Specific data or quote supporting this",
+      "citation_ids": ["cite_1", "cite_2"]
+    }
+  ],
+  "market": [...],
+  "regulatory": [...],
+  "user": [...],
+  "financial": [...],
+  "critical_insights": [
+    {
+      "insight": "Key strategic insight",
+      "implication": "What this means for the project",
+      "citation_ids": ["cite_1"]
+    }
+  ],
+  "citations": [
+    {
+      "id": "cite_1",
+      "url": "https://...",
+      "title": "Article or Report Title",
+      "source_organization": "Organization Name",
+      "source_type": "government|academic|industry_report|major_publication|financial_filing",
+      "date_published": "YYYY-MM-DD or null if unavailable",
+      "date_accessed": "YYYY-MM-DD",
+      "author": "Author Name or null",
+      "excerpt": "Relevant quote or data point from source",
+      "relevance": "How this source supports the finding",
+      "credibility_indicators": "Why this source is trustworthy"
+    }
+  ]
 }"""
 
     user_prompt = f"""PROBLEM CONTEXT:
 {problem_context}
 
-Please analyze the obstacles and challenges for this problem/solution. Use web search to gather current information about:
-- Similar solutions that have faced challenges
-- Regulatory landscape
-- Market conditions
-- Technical feasibility
-- User adoption patterns
+Please analyze the obstacles and challenges for this problem/solution.
 
-Provide comprehensive, evidence-based analysis."""
+RESEARCH REQUIREMENTS:
+Use web_search extensively to gather authoritative information from:
+- Government regulatory databases and reports
+- Academic research papers and university studies
+- Established industry analyst reports (Gartner, McKinsey, Forrester, etc.)
+- Major financial and business publications
+- Company financial filings and investor reports
+
+Focus your research on:
+- Similar solutions that have faced challenges (with specific case studies)
+- Regulatory landscape (cite specific regulations and authorities)
+- Market conditions (cite market research data with sources)
+- Technical feasibility (cite technical papers, implementation studies)
+- User adoption patterns (cite user research, surveys, adoption statistics)
+
+CRITICAL: Every obstacle, insight, and data point must be linked to at least one credible citation with complete metadata. Do not make claims without sources. If you cannot find credible sources for a potential obstacle, note it as "unverified" rather than presenting it as fact.
+
+Today's date is {datetime.utcnow().strftime("%Y-%m-%d")} - use this for date_accessed in citations."""
 
     logger.info("Calling Claude API for obstacles analysis...")
 
@@ -203,7 +262,7 @@ def extract_json_from_response(response):
         "regulatory": [],
         "user": [],
         "financial": [],
-        "critical_insights": [text_content],
-        "sources": [],
+        "critical_insights": [{"insight": text_content[:500], "implication": "Parse error", "citation_ids": []}],
+        "citations": [],
         "parse_error": "Could not parse structured JSON from response",
     }

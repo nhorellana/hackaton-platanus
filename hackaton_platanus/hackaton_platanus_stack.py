@@ -6,6 +6,9 @@ from aws_cdk import (
     aws_sqs as sqs,
     aws_dynamodb as dynamodb,
     aws_lambda_event_sources as lambda_event_sources,
+    aws_stepfunctions as sfn,
+    aws_stepfunctions_tasks as tasks,
+    aws_iam as iam,
     CfnOutput,
     RemovalPolicy,
 )
@@ -206,6 +209,176 @@ class HackatonPlatanusStack(Stack):
         jobs_table.grant_read_write_data(competitor_agent)
         jobs_table.grant_read_write_data(market_agent)
 
+        # Create Synthesis Lambda (separate from worker)
+        synthesis_lambda = _lambda.Function(
+            self, "SynthesisFunction",
+            runtime=_lambda.Runtime.PYTHON_3_11,
+            handler="synthesis.handler",
+            code=_lambda.Code.from_asset(lambda_code_path),
+            timeout=Duration.seconds(300),  # 5 minutes
+            memory_size=512,
+            description="Generates executive summary synthesis",
+            function_name="synthesis",
+            environment={
+                "JOBS_TABLE_NAME": jobs_table.table_name,
+                "ANTHROPIC_API_KEY": os.environ['ANTHROPIC_API_KEY']
+            }
+        )
+        jobs_table.grant_read_write_data(synthesis_lambda)
+
+        # Create Step Functions State Machine for Market Research Orchestration
+        # Define each agent task
+        obstacles_task = tasks.LambdaInvoke(
+            self, "InvokeObstaclesAgent",
+            lambda_function=obstacles_agent,
+            payload=sfn.TaskInput.from_object({
+                "session_id": sfn.JsonPath.string_at("$.session_id"),
+                "job_id": sfn.JsonPath.string_at("$.job_id"),
+                "instructions": sfn.JsonPath.string_at("$.instructions")
+            }),
+            result_path="$.obstacles_response",
+            retry_on_service_exceptions=True
+        ).add_retry(
+            errors=["States.TaskFailed"],
+            interval=Duration.seconds(30),
+            max_attempts=3,
+            backoff_rate=2.0
+        ).add_catch(
+            sfn.Fail(self, "ObstaclesFailed", cause="Obstacles Agent Failed"),
+            result_path="$.error"
+        )
+
+        solutions_task = tasks.LambdaInvoke(
+            self, "InvokeSolutionsAgent",
+            lambda_function=solutions_agent,
+            payload=sfn.TaskInput.from_object({
+                "session_id": sfn.JsonPath.string_at("$.session_id"),
+                "job_id": sfn.JsonPath.string_at("$.job_id"),
+                "instructions": sfn.JsonPath.string_at("$.instructions"),
+                "obstacles_findings": sfn.JsonPath.string_at("$.obstacles_response.Payload.body.findings")
+            }),
+            result_path="$.solutions_response",
+            retry_on_service_exceptions=True
+        ).add_retry(
+            errors=["States.TaskFailed"],
+            interval=Duration.seconds(30),
+            max_attempts=3,
+            backoff_rate=2.0
+        ).add_catch(
+            sfn.Fail(self, "SolutionsFailed", cause="Solutions Agent Failed"),
+            result_path="$.error"
+        )
+
+        legal_task = tasks.LambdaInvoke(
+            self, "InvokeLegalAgent",
+            lambda_function=legal_agent,
+            payload=sfn.TaskInput.from_object({
+                "session_id": sfn.JsonPath.string_at("$.session_id"),
+                "job_id": sfn.JsonPath.string_at("$.job_id"),
+                "instructions": sfn.JsonPath.string_at("$.instructions"),
+                "obstacles_findings": sfn.JsonPath.string_at("$.obstacles_response.Payload.body.findings"),
+                "solutions_findings": sfn.JsonPath.string_at("$.solutions_response.Payload.body.findings")
+            }),
+            result_path="$.legal_response",
+            retry_on_service_exceptions=True
+        ).add_retry(
+            errors=["States.TaskFailed"],
+            interval=Duration.seconds(30),
+            max_attempts=3,
+            backoff_rate=2.0
+        ).add_catch(
+            sfn.Fail(self, "LegalFailed", cause="Legal Agent Failed"),
+            result_path="$.error"
+        )
+
+        competitor_task = tasks.LambdaInvoke(
+            self, "InvokeCompetitorAgent",
+            lambda_function=competitor_agent,
+            payload=sfn.TaskInput.from_object({
+                "session_id": sfn.JsonPath.string_at("$.session_id"),
+                "job_id": sfn.JsonPath.string_at("$.job_id"),
+                "instructions": sfn.JsonPath.string_at("$.instructions"),
+                "obstacles_findings": sfn.JsonPath.string_at("$.obstacles_response.Payload.body.findings"),
+                "solutions_findings": sfn.JsonPath.string_at("$.solutions_response.Payload.body.findings"),
+                "legal_findings": sfn.JsonPath.string_at("$.legal_response.Payload.body.findings")
+            }),
+            result_path="$.competitor_response",
+            retry_on_service_exceptions=True
+        ).add_retry(
+            errors=["States.TaskFailed"],
+            interval=Duration.seconds(30),
+            max_attempts=3,
+            backoff_rate=2.0
+        ).add_catch(
+            sfn.Fail(self, "CompetitorFailed", cause="Competitor Agent Failed"),
+            result_path="$.error"
+        )
+
+        market_task = tasks.LambdaInvoke(
+            self, "InvokeMarketAgent",
+            lambda_function=market_agent,
+            payload=sfn.TaskInput.from_object({
+                "session_id": sfn.JsonPath.string_at("$.session_id"),
+                "job_id": sfn.JsonPath.string_at("$.job_id"),
+                "instructions": sfn.JsonPath.string_at("$.instructions"),
+                "obstacles_findings": sfn.JsonPath.string_at("$.obstacles_response.Payload.body.findings"),
+                "solutions_findings": sfn.JsonPath.string_at("$.solutions_response.Payload.body.findings"),
+                "legal_findings": sfn.JsonPath.string_at("$.legal_response.Payload.body.findings"),
+                "competitor_findings": sfn.JsonPath.string_at("$.competitor_response.Payload.body.findings")
+            }),
+            result_path="$.market_response",
+            retry_on_service_exceptions=True
+        ).add_retry(
+            errors=["States.TaskFailed"],
+            interval=Duration.seconds(30),
+            max_attempts=3,
+            backoff_rate=2.0
+        ).add_catch(
+            sfn.Fail(self, "MarketFailed", cause="Market Agent Failed"),
+            result_path="$.error"
+        )
+
+        synthesis_task = tasks.LambdaInvoke(
+            self, "InvokeSynthesisAgent",
+            lambda_function=synthesis_lambda,
+            payload=sfn.TaskInput.from_object({
+                "session_id": sfn.JsonPath.string_at("$.session_id"),
+                "job_id": sfn.JsonPath.string_at("$.job_id"),
+                "instructions": sfn.JsonPath.string_at("$.instructions"),
+                "obstacles_findings": sfn.JsonPath.string_at("$.obstacles_response.Payload.body.findings"),
+                "solutions_findings": sfn.JsonPath.string_at("$.solutions_response.Payload.body.findings"),
+                "legal_findings": sfn.JsonPath.string_at("$.legal_response.Payload.body.findings"),
+                "competitor_findings": sfn.JsonPath.string_at("$.competitor_response.Payload.body.findings"),
+                "market_findings": sfn.JsonPath.string_at("$.market_response.Payload.body.findings")
+            }),
+            result_path="$.synthesis_response",
+            retry_on_service_exceptions=True
+        ).add_retry(
+            errors=["States.TaskFailed"],
+            interval=Duration.seconds(30),
+            max_attempts=2,
+            backoff_rate=2.0
+        ).add_catch(
+            sfn.Fail(self, "SynthesisFailed", cause="Synthesis Failed"),
+            result_path="$.error"
+        )
+
+        # Chain the tasks sequentially
+        definition = obstacles_task \
+            .next(solutions_task) \
+            .next(legal_task) \
+            .next(competitor_task) \
+            .next(market_task) \
+            .next(synthesis_task)
+
+        # Create the state machine
+        market_research_state_machine = sfn.StateMachine(
+            self, "MarketResearchStateMachine",
+            state_machine_name="market-research-workflow",
+            definition_body=sfn.DefinitionBody.from_chainable(definition),
+            timeout=Duration.minutes(30)
+        )
+
         # Create worker Lambda functions
         slack_worker = _lambda.Function(
             self, "SlackWorker",
@@ -231,18 +404,13 @@ class HackatonPlatanusStack(Stack):
             runtime=_lambda.Runtime.PYTHON_3_11,
             handler="market_research_worker.handler",
             code=_lambda.Code.from_asset(lambda_code_path),
-            timeout=Duration.seconds(900),  # 15 minutes
-            memory_size=1024,  # 1GB
-            description="Orchestrates market research agents",
+            timeout=Duration.seconds(60),  # Just needs to start Step Function
+            memory_size=256,  # Minimal memory needed
+            description="Starts market research Step Function execution",
             function_name="market_research_worker",
             environment={
                 "JOBS_TABLE_NAME": jobs_table.table_name,
-                "ANTHROPIC_API_KEY": os.environ['ANTHROPIC_API_KEY'],
-                "OBSTACLES_AGENT_NAME": obstacles_agent.function_name,
-                "SOLUTIONS_AGENT_NAME": solutions_agent.function_name,
-                "LEGAL_AGENT_NAME": legal_agent.function_name,
-                "COMPETITOR_AGENT_NAME": competitor_agent.function_name,
-                "MARKET_AGENT_NAME": market_agent.function_name
+                "STATE_MACHINE_ARN": market_research_state_machine.state_machine_arn
             }
         )
 
@@ -264,19 +432,15 @@ class HackatonPlatanusStack(Stack):
         jobs_table.grant_read_write_data(slack_worker)
         jobs_table.grant_read_write_data(market_research_worker)
         jobs_table.grant_read_write_data(external_research_worker)
-        
+
         # Grant conversations table permissions to slack worker
         conversations_table.grant_read_write_data(slack_worker)
-        
+
         # Grant SQS permissions to slack worker for requeuing
         slack_queue.grant_send_messages(slack_worker)
 
-        # Grant market_research_worker permission to invoke agent lambdas
-        obstacles_agent.grant_invoke(market_research_worker)
-        solutions_agent.grant_invoke(market_research_worker)
-        legal_agent.grant_invoke(market_research_worker)
-        competitor_agent.grant_invoke(market_research_worker)
-        market_agent.grant_invoke(market_research_worker)
+        # Grant market_research_worker permission to start Step Function executions
+        market_research_state_machine.grant_start_execution(market_research_worker)
 
         # Connect queues to worker lambdas
         slack_worker.add_event_source(
@@ -503,4 +667,10 @@ class HackatonPlatanusStack(Stack):
             self, "ConversationsTableName",
             value=conversations_table.table_name,
             description="Conversations DynamoDB table name"
+        )
+
+        CfnOutput(
+            self, "MarketResearchStateMachineArn",
+            value=market_research_state_machine.state_machine_arn,
+            description="Market Research Step Functions State Machine ARN"
         )

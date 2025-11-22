@@ -6,11 +6,12 @@
 3. [Complete Flow Diagram](#complete-flow-diagram)
 4. [Step-by-Step Execution](#step-by-step-execution)
 5. [Agent Details](#agent-details)
-6. [Context Accumulation Strategy](#context-accumulation-strategy)
-7. [State Management](#state-management)
-8. [Error Handling](#error-handling)
-9. [Performance Characteristics](#performance-characteristics)
-10. [Example Execution](#example-execution)
+6. [Citation System](#citation-system)
+7. [Context Accumulation Strategy](#context-accumulation-strategy)
+8. [State Management](#state-management)
+9. [Error Handling](#error-handling)
+10. [Performance Characteristics](#performance-characteristics)
+11. [Example Execution](#example-execution)
 
 ---
 
@@ -608,6 +609,211 @@ dynamodb.update(job_id, status="completed", result=final_result)
 7. Strategic recommendations
 
 **Execution Time:** ~30-45 seconds
+
+---
+
+## Citation System
+
+### Overview
+
+All research findings are backed by **comprehensive, verifiable source citations** to provide credibility for multi-million dollar investment decisions. Every claim, data point, and assessment traces back to authoritative sources.
+
+### Why Citations Matter
+
+The market research system is designed to inform **institutional go/no-go decisions** on major projects. To ensure research integrity:
+
+- **Credibility:** Every finding must be verifiable by third parties
+- **Accountability:** Sources provide audit trail for due diligence
+- **Trust:** Institutional investors require evidence-based analysis
+- **Compliance:** Regulatory and financial claims need official sources
+
+### Citation Structure
+
+Each citation includes comprehensive metadata:
+
+```json
+{
+  "id": "cite_1",
+  "url": "https://...",
+  "title": "Report/Article/Regulation Title",
+  "source_organization": "Publishing Organization",
+  "source_type": "government|academic|industry_report|major_publication|...",
+  "date_published": "YYYY-MM-DD",
+  "date_accessed": "YYYY-MM-DD",
+  "author": "Author Name or null",
+  "excerpt": "Relevant quote or data point",
+  "relevance": "How this supports the finding",
+  "credibility_indicators": "Why this source is trustworthy"
+}
+```
+
+### Source Prioritization by Agent
+
+#### Obstacles Agent
+**Prioritizes:**
+1. Government sources (.gov) - regulatory data, statistics
+2. Academic research (.edu) - peer-reviewed studies
+3. Industry reports - Gartner, McKinsey, Forrester, IDC
+4. Major publications - WSJ, NYT, Bloomberg, Reuters
+5. Company financial filings - 10-K, annual reports
+
+**Avoids:** Blog posts, social media, Wikipedia, promotional content
+
+#### Solutions Agent
+**Prioritizes:**
+1. Official product websites and documentation
+2. Product review sites - G2, Capterra, TrustRadius
+3. Industry analyst reports - Gartner Magic Quadrants, Forrester Wave
+4. Major tech publications - TechCrunch, The Information
+5. Company financial data - Crunchbase, PitchBook
+
+**Avoids:** Unverified claims, promotional content without validation
+
+#### Legal Agent
+**Prioritizes:**
+1. Government regulatory websites (.gov domains)
+2. Official legal databases - regulations.gov, EUR-Lex
+3. Regulatory body publications - SEC, FTC, FDA, FCC
+4. Major law firm compliance guides
+5. Official legal texts with section numbers
+
+**Avoids:** Unofficial interpretations, outdated information, secondary sources without primary citation
+
+#### Competitor Agent
+**Prioritizes:**
+1. Company financial data - Crunchbase, PitchBook, SEC filings
+2. Industry analyst reports - Gartner, Forrester, IDC
+3. Major business publications - Bloomberg, WSJ, Forbes
+4. Market research firms - Statista, eMarketer, CB Insights
+5. Company official websites and investor relations
+
+**Avoids:** Speculation, outdated information, unverified claims
+
+#### Market Agent
+**Prioritizes:**
+1. Market research firms - Gartner, Forrester, IDC, Statista
+2. Industry associations - official trade statistics
+3. Government data - Census Bureau, BLS, industry regulators
+4. Financial research - Goldman Sachs, Morgan Stanley, McKinsey
+5. Public company data - SEC filings, earnings transcripts
+
+**Avoids:** Unsubstantiated estimates, outdated reports (>2 years), marketing materials
+
+### Citation Flow
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│ Agent Execution                                             │
+│ 1. Receives research task                                   │
+│ 2. Conducts web_search/web_fetch                           │
+│ 3. For EACH finding, creates citation object               │
+│ 4. Links findings to citation_ids                          │
+│ 5. Returns {findings with citation_ids, citations array}   │
+└─────────────────────────────────────────────────────────────┘
+                           │
+                           ▼
+┌─────────────────────────────────────────────────────────────┐
+│ Synthesis Generation                                        │
+│ 1. Collects all citations from 5 agents                    │
+│ 2. Renumbers with prefixes (obs_, sol_, leg_, comp_, mkt_) │
+│ 3. Creates master citations list                           │
+│ 4. Claude writes synthesis using [cite_id] references      │
+│ 5. Returns {executive_summary with inline citations,       │
+│             citations array, metadata}                      │
+└─────────────────────────────────────────────────────────────┘
+                           │
+                           ▼
+┌─────────────────────────────────────────────────────────────┐
+│ Final Report Structure                                      │
+│ {                                                           │
+│   "instructions": "...",                                    │
+│   "findings": {                                             │
+│     "obstacles": {...with citations array},                │
+│     "solutions": {...with citations array},                │
+│     "legal": {...with citations array},                    │
+│     "competitors": {...with citations array},              │
+│     "market": {...with citations array}                    │
+│   },                                                        │
+│   "synthesis": {                                            │
+│     "executive_summary": "...text with [cite_id]...",      │
+│     "citations": [...master list...],                      │
+│     "citation_count": 47,                                  │
+│     "research_date": "2024-01-15"                          │
+│   }                                                         │
+│ }                                                           │
+└─────────────────────────────────────────────────────────────┘
+```
+
+### Citation Requirements
+
+#### Every Finding Must Include:
+
+**Quantitative Claims:**
+- ✅ "Market valued at $2.5B in 2024 [mkt_1]"
+- ❌ "Large market opportunity"
+
+**Qualitative Assessments:**
+- ✅ "Competitor X holds 34% market share [comp_3, comp_4]"
+- ❌ "Competitor X is the market leader"
+
+**Regulatory Requirements:**
+- ✅ "GDPR Article 6 requires explicit consent [leg_2]"
+- ❌ "GDPR requires consent"
+
+**Product Information:**
+- ✅ "Product Y raised $50M Series B in Dec 2023 [sol_5]"
+- ❌ "Product Y is well-funded"
+
+#### Multiple Citations:
+
+Findings can reference multiple sources for validation:
+```
+"The SaaS market is projected to grow at 18% CAGR from 2024-2028
+[mkt_1, mkt_2], driven primarily by cloud migration [mkt_3] and
+remote work adoption [mkt_4]."
+```
+
+### Example Citation Output
+
+```json
+{
+  "id": "mkt_1",
+  "url": "https://www.gartner.com/en/newsroom/press-releases/2024-01-15-gartner-forecasts-worldwide-saas-revenue",
+  "title": "Gartner Forecasts Worldwide SaaS Revenue to Reach $195 Billion in 2024",
+  "source_organization": "Gartner, Inc.",
+  "source_type": "market_research",
+  "date_published": "2024-01-15",
+  "date_accessed": "2024-01-20",
+  "author": "Gartner Research",
+  "excerpt": "The worldwide SaaS market is forecast to grow 18% in 2024 to reach $195 billion, up from $165 billion in 2023",
+  "relevance": "Provides official market size and growth rate projection for SaaS market",
+  "credibility_indicators": "Gartner is a leading IT research and advisory firm, widely cited in industry analyses. This is an official press release with specific quantified projections."
+}
+```
+
+### Quality Assurance
+
+#### Agent Prompts Enforce:
+- Every claim must link to at least one citation
+- Quantitative data requires primary source citation
+- Multiple sources preferred for key claims
+- Date recency checked (prefer <2 year old data)
+- Official sources prioritized over secondary
+
+#### Synthesis Validation:
+- All citation IDs in text must exist in citations array
+- Master citations list consolidates all agent citations
+- No duplicate citations (unique by URL + title)
+- Citation density: ~1 citation per 50-100 words of analysis
+
+### Benefits
+
+1. **Due Diligence Ready:** Every claim can be independently verified
+2. **Regulatory Compliance:** Legal citations include official regulation codes
+3. **Financial Validation:** Market sizes and growth rates have research backing
+4. **Competitive Intelligence:** Competitor data sourced from financial filings
+5. **Audit Trail:** Complete provenance of all research findings
+6. **Credibility:** Institutional-grade research suitable for board presentations
 
 ---
 
