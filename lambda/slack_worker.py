@@ -1,8 +1,14 @@
 import json
 import logging
 import os
+<<<<<<< Updated upstream
 from shared.slack import SlackHelper
 from anthropic import Anthropic
+=======
+from slack_sdk import WebClient
+from slack_sdk.errors import SlackApiError
+from shared.anthropic import Anthropic, ConversationMessage
+>>>>>>> Stashed changes
 
 import boto3
 
@@ -25,20 +31,17 @@ jobs_table = dynamodb.Table(JOBS_TABLE_NAME)
 conversations_table = dynamodb.Table(os.environ['CONVERSATIONS_TABLE_NAME'])
 
 def extract_email_and_question_claude(text):
-    """Extracts email and question using Claude 3 Haiku."""
+    """Extracts email and question using Claude via the anthropic helper."""
     prompt = f"""
     Instruction: "{text}"
     Task: Extract target email and question.
     Output JSON only: keys "email", "question".
     """
     try:
-        message = anthropic_client.messages.create(
-            model="claude-3-haiku-20240307",
-            max_tokens=300,
-            temperature=0,
-            messages=[{"role": "user", "content": prompt}]
-        )
-        data = json.loads(message.content[0].text)
+        # Create a message using the anthropic helper
+        messages = [ConversationMessage(role="user", content=prompt, timestamp="")]
+        response = anthropic_client.send_message(messages)
+        data = json.loads(response)
         return data.get("email"), data.get("question")
     except Exception as e:
         print(f"AI Error: {e}")
