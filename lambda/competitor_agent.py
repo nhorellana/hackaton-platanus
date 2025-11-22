@@ -10,7 +10,7 @@ logger.setLevel(logging.INFO)
 ANTHROPIC_API_KEY = os.environ["ANTHROPIC_API_KEY"]
 
 # Initialize Anthropic client
-client = Anthropic(api_key=ANTHROPIC_API_KEY)
+anthropic = Anthropic(api_key=ANTHROPIC_API_KEY)
 
 
 def handler(event, context):
@@ -145,10 +145,11 @@ Provide detailed, current information with sources."""
 
     logger.info("Calling Claude API for competitor analysis...")
 
-    response = client.create_message(
-        model="claude-sonnet-4-20250514",
-        max_tokens=4000,
-        temperature=0.3,
+    response = anthropic.send_message(
+        messages=[ConversationMessage(
+            role="user",
+            content=user_prompt
+        )],
         system=system_prompt,
         tools=[
             {
