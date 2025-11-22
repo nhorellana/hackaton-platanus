@@ -14,8 +14,10 @@ logger.setLevel(logging.INFO)
 dynamodb = boto3.resource('dynamodb')
 sqs = boto3.client('sqs')
 
+ANTHROPIC_API_KEY = os.environ['ANTHROPIC_API_KEY']
+
 # Initialize external service clients
-anthropic_client = Anthropic(api_key=os.environ.get('ANTHROPIC_API_KEY'))
+anthropic_client = anthropic = Anthropic(ANTHROPIC_API_KEY)
 slack_client = SlackHelper(token=os.environ['SLACK_BOT_TOKEN'])
 
 # Get environment variables
@@ -50,7 +52,7 @@ def generate_question(text):
         # Create a message using the anthropic helper
         messages = [ConversationMessage(role="user", content=prompt, timestamp="")]
         response = anthropic_client.send_message(messages)
-        return response.content
+        return response
     
     except Exception as e:
         print(f"AI Error: {e}")
@@ -78,15 +80,15 @@ def lambda_handler(event, context):
         jobStatus = job.status
         jobInstruction = job.instructions
 
-        print(f">> Processing Job {jobId} | Status: {jobStatus}")
+        print(f">> In_PROGRESS Job {jobId} | Status: {jobStatus}")
 
         # ====================================================
-        # STATE 1: CREATED -> Transition to PROCESSING
+        # STATE 1: CREATED -> Transition to IN_PROGRESS
         # ====================================================
         if jobStatus == "CREATED":
             # A. AI Extraction
 
-            target_email = json.parse(jobInstruction)['contact']['email']
+            target_email = json.loads(jobInstruction)['contact']['email']
 
             question = generate_question(jobInstruction)
 
@@ -128,15 +130,15 @@ def lambda_handler(event, context):
                 print(f"User {target_email} not found.")
 
         # ====================================================
-        # STATE 2: PROCESSING -> Transition to FINISHED
+        # STATE 2: IN_PROGRESS -> Transition to FINISHED
         # ====================================================
-        elif jobStatus == "PROCESSING":
+        elif jobStatus == "IN_PROGRESS":
             # A. Fetch Technical Details from 'JobConversations'
             # We need the timestamp and channel to poll.
             conv_response = conversations_table.get_item(Key={'jobId': jobId})
             
             if 'Item' not in conv_response:
-                print(f"Error: Job is PROCESSING but no conversation record found.")
+                print(f"Error: Job is IN_PROGRESS but no conversation record found.")
                 continue
 
             conv_item = conv_response['Item']
