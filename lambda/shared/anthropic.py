@@ -4,6 +4,7 @@ import os
 import urllib.request
 import urllib.error
 from dataclasses import dataclass
+from typing import Literal
 
 logger = logging.getLogger()
 logger.setLevel(logging.INFO)
@@ -12,7 +13,7 @@ ANTHROPIC_API_KEY = os.environ['ANTHROPIC_API_KEY']
 
 @dataclass
 class ConversationMessage:
-    role: str
+    role: Literal["user", "assistant"]
     content: str
     timestamp: str
 
@@ -20,12 +21,13 @@ class Anthropic():
     def __init__(self, api_key):
         self.api_key = api_key
 
-    def send_message(self, messages: list[ConversationMessage]) -> str:
+    def send_message(self, messages: list[ConversationMessage], system: str = None) -> str:
         '''
         Call AI API to get a response.
 
         Args:
             messages: List of previous messages
+            system: Optional system instruction to guide the assistant's behavior
 
         Returns:
             AI generated response string
@@ -47,6 +49,10 @@ class Anthropic():
                 { 'role': msg.role, 'content': msg.content } for msg in messages
             ]
         }
+        
+        # Add system instruction if provided
+        if system:
+            payload['system'] = system
         
         # Make the HTTP request
         data = json.dumps(payload).encode('utf-8')
