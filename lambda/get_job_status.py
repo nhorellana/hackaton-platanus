@@ -4,6 +4,7 @@ import os
 
 import boto3
 from botocore.exceptions import ClientError
+from shared.job_model import JobHandler
 
 logger = logging.getLogger()
 logger.setLevel(logging.INFO)
@@ -30,6 +31,7 @@ def handler(event, context):
     try:
         # Extract job_id from path parameters
         job_id = event.get('pathParameters', {}).get('id')
+        session_id = event.get('queryStringParameters', {}).get('session_id')
 
         if not job_id:
             return {
@@ -45,43 +47,15 @@ def handler(event, context):
 
         logger.info(f'Fetching status for job {job_id}')
 
-        # Get job from DynamoDB
-        response = jobs_table.get_item(Key={'id': job_id})
-
-        if 'Item' not in response:
-            return {
-                'statusCode': 404,
-                'headers': {
-                    'Content-Type': 'application/json',
-                    'Access-Control-Allow-Origin': '*',
-                },
-                'body': json.dumps(
-                    {'error': 'Job not found', 'message': f'No job found with id: {job_id}'}
-                ),
-            }
-
-        job = response['Item']
-
-        # Determine if job is in a final state
-        status = job.get('status', 'unknown')
-        is_final = status in ['completed', 'failed']
-
-        # Parse result if it's a JSON string
-        result = job.get('result', '')
-        if result and isinstance(result, str):
-            try:
-                result = json.loads(result)
-            except json.JSONDecodeError:
-                # Keep as string if not valid JSON
-                pass
+        job = JobHandler(JOBS_TABLE_NAME).find_one(session_id=session_id, job_id=job_id)
 
         # Build response
         response_data = {
             'job_id': job_id,
-            'status': status,
+            'status': job.status,
             'type': job.get('type', 'unknown'),
             'instructions': job.get('instructions', ''),
-            'is_final': is_final,
+            'is_final': job.status in ['COMPLETED', 'FAILED'],
             'created_at': job.get('created_at'),
             'updated_at': job.get('updated_at'),
         }
@@ -97,8 +71,8 @@ def handler(event, context):
             response_data['error_message'] = job['error_message']
 
         # Add result for completed jobs
-        if status == 'completed' and result:
-            response_data['result'] = result
+        if job.status == 'COMPLETED' and job.result:
+            response_data['result'] = job.result
 
         # Add partial findings for market research jobs (for progress tracking)
         if job.get('type') == 'market_research':
@@ -137,7 +111,7 @@ def handler(event, context):
             if findings:
                 response_data['partial_findings'] = findings
 
-        logger.info(f'Successfully retrieved status for job {job_id}: {status}')
+        logger.info(f'Successfully retrieved status for job {job_id}: {job.status}')
 
         return {
             'statusCode': 200,

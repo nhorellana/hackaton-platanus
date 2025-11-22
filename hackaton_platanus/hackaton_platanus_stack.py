@@ -27,6 +27,10 @@ class HackatonPlatanusStack(Stack):
             self, "JobsTable",
             table_name="jobs",
             partition_key=dynamodb.Attribute(
+                name="session_id",
+                type=dynamodb.AttributeType.STRING
+            ),
+            sort_key=dynamodb.Attribute(
                 name="id",
                 type=dynamodb.AttributeType.STRING
             ),
@@ -354,8 +358,23 @@ class HackatonPlatanusStack(Stack):
             }
         )
 
+        get_jobs_lambda = _lambda.Function(
+            self, "GetJobsFunction",
+            runtime=_lambda.Runtime.PYTHON_3_11,
+            handler="get_jobs.handler",
+            code=_lambda.Code.from_asset(lambda_code_path),
+            timeout=Duration.seconds(30),
+            memory_size=256,
+            description="Get jobs for a session Lambda",
+            function_name="get_jobs",
+            environment={
+                "JOBS_TABLE_NAME": jobs_table.table_name
+            }
+        )
+
         # Grant DynamoDB read permissions to get_job_status lambda
         jobs_table.grant_read_data(get_job_status_lambda)
+        jobs_table.grant_read_data(get_jobs_lambda)
 
         # Create API Gateway REST API
         api = apigateway.RestApi(
@@ -378,8 +397,17 @@ class HackatonPlatanusStack(Stack):
             proxy=True
         )
 
+        # Add Lambda integration for get jobs
+        get_jobs_integration = apigateway.LambdaIntegration(
+            get_jobs_lambda,
+            proxy=True
+        )
+
         # Add POST method to /jobs endpoint
         jobs_resource.add_method("POST", problem_integration)
+
+        # Add GET method to /jobs endpoint
+        jobs_resource.add_method("GET", get_jobs_integration)
 
         # Create /jobs/{id} resource for getting job status
         job_id_resource = jobs_resource.add_resource("{id}")

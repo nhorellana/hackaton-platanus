@@ -206,6 +206,7 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
 
                     if queue_url:
                         job_item = JobModel(
+                            session_id=session_id,
                             status='CREATED',
                             job_type=job_key,
                             instructions=json.dumps(job_payload),
