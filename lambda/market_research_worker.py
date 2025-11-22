@@ -44,8 +44,6 @@ def handler(event, context):
             message_body = json.loads(record["body"])
             job_id = message_body["job_id"]
             session_id = message_body["session_id"]
-            
-            instructions = message_body["instructions"]
 
             job = job_handler.find_one(session_id=session_id, job_id=job_id)
             if job is None:
@@ -69,7 +67,7 @@ def handler(event, context):
                     {
                         'session_id': session_id,
                         'job_id': job_id,
-                        'instructions': instructions,
+                        'instructions': job.instructions,
                     }
                 )
                 obstacles_findings = extract_findings(obstacles_response)
@@ -82,7 +80,7 @@ def handler(event, context):
                     {
                         'session_id': session_id,
                         'job_id': job_id,
-                        'instructions': instructions,
+                        'instructions': job.instructions,
                         "obstacles_findings": obstacles_findings,
                     },
                 )
@@ -96,7 +94,7 @@ def handler(event, context):
                     {
                         'session_id': session_id,
                         'job_id': job_id,
-                        'instructions': instructions,
+                        'instructions': job.instructions,
                         "obstacles_findings": obstacles_findings,
                         "solutions_findings": solutions_findings,
                     },
@@ -111,7 +109,7 @@ def handler(event, context):
                     {
                         'session_id': session_id,
                         'job_id': job_id,
-                        'instructions': instructions,
+                        'instructions': job.instructions,
                         "obstacles_findings": obstacles_findings,
                         "solutions_findings": solutions_findings,
                         "legal_findings": legal_findings,
@@ -127,7 +125,7 @@ def handler(event, context):
                     {
                         'session_id': session_id,
                         'job_id': job_id,
-                        'instructions': instructions,
+                        'instructions': job.instructions,
                         "obstacles_findings": obstacles_findings,
                         "solutions_findings": solutions_findings,
                         "legal_findings": legal_findings,
@@ -140,7 +138,7 @@ def handler(event, context):
                 # Synthesis: Generate executive summary
                 logger.info(f"Generating synthesis for job {job_id}")
                 synthesis = generate_synthesis(
-                    instructions,
+                    job.instructions,
                     obstacles_findings,
                     solutions_findings,
                     legal_findings,
@@ -150,7 +148,7 @@ def handler(event, context):
 
                 # Update job with final result
                 final_result = {
-                    "instructions": instructions,
+                    "instructions": job.instructions,
                     "findings": {
                         "obstacles": obstacles_findings,
                         "solutions": solutions_findings,
