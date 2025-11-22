@@ -49,6 +49,13 @@ class HackatonPlatanusStack(Stack):
         )
 
         # Create SQS Queues
+        problem_queue = sqs.Queue(
+            self, "ProblemQueue",
+            queue_name="problem",
+            visibility_timeout=Duration.seconds(1000),  # 16+ minutes
+            retention_period=Duration.days(14)
+        )
+
         slack_queue = sqs.Queue(
             self, "SlackQueue",
             queue_name="slack",
@@ -68,6 +75,20 @@ class HackatonPlatanusStack(Stack):
             queue_name="external_research",
             visibility_timeout=Duration.seconds(1000),  # 16+ minutes
             retention_period=Duration.days(14)
+        )
+
+        problem_lambda = _lambda.Function(
+            self, "ProblemFunction",
+            runtime=_lambda.Runtime.PYTHON_3_11,
+            handler="problem.handler",
+            code=_lambda.Code.from_asset(lambda_code_path),
+            timeout=Duration.seconds(800),
+            memory_size=256,
+            description="Problem Lambda that queues problem job requests",
+            function_name="problem",
+            environment={
+                "PROBLEM_QUEUE_URL": problem_queue.queue_url
+            }
         )
 
         # Define the Orchestrator Lambda function
@@ -92,6 +113,7 @@ class HackatonPlatanusStack(Stack):
         )
 
         # Grant permissions to orchestrator
+        problem_queue.grant_send_messages(problem_lambda)
         jobs_table.grant_write_data(orchestrator_lambda)
         slack_queue.grant_send_messages(orchestrator_lambda)
         market_research_queue.grant_send_messages(orchestrator_lambda)
@@ -260,6 +282,13 @@ class HackatonPlatanusStack(Stack):
             )
         )
 
+        orchestrator_lambda.add_event_source(
+            lambda_event_sources.SqsEventSource(
+                problem_queue,
+                batch_size=1
+            )
+        )
+
         market_research_worker.add_event_source(
             lambda_event_sources.SqsEventSource(
                 market_research_queue,
@@ -344,13 +373,13 @@ class HackatonPlatanusStack(Stack):
         jobs_resource = api.root.add_resource("jobs")
 
         # Add Lambda integration to API Gateway
-        orchestrator_integration = apigateway.LambdaIntegration(
-            orchestrator_lambda,
+        problem_integration = apigateway.LambdaIntegration(
+            problem_lambda,
             proxy=True
         )
 
         # Add POST method to /jobs endpoint
-        jobs_resource.add_method("POST", orchestrator_integration)
+        jobs_resource.add_method("POST", problem_integration)
 
         # Create /jobs/{id} resource for getting job status
         job_id_resource = jobs_resource.add_resource("{id}")
