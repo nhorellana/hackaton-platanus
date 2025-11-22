@@ -9,7 +9,7 @@ dynamodb = boto3.resource('dynamodb')
 class JobModel:
     session_id: str
     status: Literal['CREATED', 'IN_PROGRESS', 'COMPLETED', 'FAILED']
-    job_type: Literal['ADI', 'ECG', 'VEE']
+    job_type: Literal['slack', 'research', 'external_research']
     instructions: str
     context_summary: str
     created_at: str
