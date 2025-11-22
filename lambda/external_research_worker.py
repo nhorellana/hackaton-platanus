@@ -56,9 +56,9 @@ def handler(event, context):
             context_summary = instructions.get('context_summary', job.context_summary)
 
             # Update job status to IN_PROGRESS
-
-            job_handler._update(
-
+            job_handler.mark_in_progress(
+                session_id=session_id,
+                job_id=job_id
             )
 
             # Conduct external expert search
