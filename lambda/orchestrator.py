@@ -107,7 +107,7 @@ Analyze the provided FULL_PROBLEM_DECLARATION and the INTERNAL_REGISTRY_DATA.
    - external_research: Activate only if the problem is highly technical, legal, or specialized (e.g., Blockchain, AI, new regulation) requiring external validation not available on our team of viability (Score 3).
 
 [3] CONTENT GENERATION: For every activated module, generate the full content details:
-   - slack: Analyze the INTERNAL_REGISTRY_DATA to identify the most relevant people to contact. Select 2-3 specific individuals whose roles, project experience, or expertise align with the problem. Create a 'contacts' array where each contact is a separate object with: name, email, role, justification for selection based on their projects/expertise, and 2-3 specific questions or data points to request from them.
+   - slack: Analyze the INTERNAL_REGISTRY_DATA to identify the most relevant people to contact. Select 2-3 specific individuals whose roles, project experience, or expertise align with the problem. Create a 'contacts' array where each contact is a separate object with: name, email, role, justification for selection based on their projects/expertise, and 2-3 specific questions or data points to request from them the questions should be chat answerable, don't require extensive deliverables or studies.
    - research: Generate 3 highly specific search queries and 3 expected quantifiable data points.
    - external_research: Define the precise expert profile and generate 3 critical, high-level, challenging questions.
 

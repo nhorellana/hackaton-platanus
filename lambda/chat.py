@@ -93,6 +93,22 @@ FORMATO DE RESPUESTA:
 - Mantén cada mensaje enfocado en UN solo aspecto
 - Cuando reformules el problema, usa SIEMPRE: "El problema de fondo pareciera ser: [x]"
 
+**FORMATO JSON OBLIGATORIO:**
+Tu respuesta DEBE ser un JSON válido con esta estructura exacta:
+{
+  "message": "tu respuesta conversacional aquí",
+  "temperature": X
+}
+
+Donde:
+- "message": Tu respuesta normal siguiendo todas las reglas anteriores
+- "temperature": Número del 1 al 10 que evalúa qué tan cerca está el usuario de un problema real:
+  * 1-2: Solo habla de soluciones sin problema claro
+  * 3-4: Problema vago o superficial, sin cuantificación
+  * 5-6: Problema identificado pero sin impacto medible
+  * 7-8: Problema claro con algún impacto cuantificado
+  * 9-10: Problema crítico, bien cuantificado, con causa raíz identificada
+
 Mantén un tono conversacional, empático y desafiante. Tu trabajo es ser un espejo que refleja el problema real.
 '''
 
@@ -151,17 +167,28 @@ def handler(event, context):
         )
         conversation_history.append(user_message)
 
-        # Call AI API (placeholder - implement your actual AI integration)
+        # Call AI API for main response
         anthropic = Anthropic(ANTHROPIC_API_KEY)
         ai_response = anthropic.send_message(
             messages=conversation_history,
             system=SYSTEM_INSTRUCTION
         )
 
-        # Add AI response to history
+        # Parse JSON response to extract message and temperature
+        try:
+            response_data = json.loads(ai_response)
+            message_content = response_data.get('message', ai_response)  # Fallback to full response
+            temperature_score = response_data.get('temperature', 5)  # Default to 5 if missing
+        except json.JSONDecodeError:
+            # If AI doesn't return valid JSON, use full response as message and default temperature
+            logger.warning("AI response was not valid JSON, using fallback")
+            message_content = ai_response
+            temperature_score = 5
+
+        # Add AI response to history (store the message content, not the JSON)
         assistant_message = ConversationMessage(
             role='assistant',
-            content=ai_response,
+            content=message_content,
             timestamp=datetime.utcnow().isoformat(),
         )
         conversation_history.append(assistant_message)
@@ -177,7 +204,8 @@ def handler(event, context):
             'body': json.dumps(
                 {
                     'session_id': session_id,
-                    'message': ai_response,
+                    'message': message_content,
+                    'temperature': temperature_score,
                     'conversation_length': len(conversation_history),
                     'timestamp': datetime.utcnow().isoformat(),
                 }
