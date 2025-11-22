@@ -41,3 +41,44 @@ class JobHandler:
         if item:
             return JobModel(**item)
         return None
+        
+    def _update(
+        self,
+        session_id: str,
+        job_id: str,
+        status: Literal['IN_PROGRESS', 'COMPLETED', 'FAILED'],
+        result: str | None = None,
+    ) -> None:
+        update_expression = 'SET #status = :status, updated_at = :updated_at'
+        expression_attribute_values = {
+            ':status': status,
+            ':updated_at': boto3.dynamodb.conditions.Attr('updated_at').default_value
+        }
+        expression_attribute_names = {
+            '#status': 'status',
+        }
+
+        if result is not None:
+            update_expression += ', #result = :result'
+            expression_attribute_values[':result'] = result
+            expression_attribute_names['#result'] = 'result'
+
+
+        self.jobs_table.update_item(
+            Key={
+                'session_id': session_id,
+                'id': job_id,
+            },
+            UpdateExpression=update_expression,
+            ExpressionAttributeNames=expression_attribute_names,
+            ExpressionAttributeValues=expression_attribute_values
+        )
+    
+    def mark_in_progress(self, session_id: str, job_id: str) -> None:
+        self._update(session_id, job_id, 'IN_PROGRESS')
+
+    def mark_completed(self, session_id: str, job_id: str, result: str) -> None:
+        self._update(session_id, job_id, 'COMPLETED')
+
+    def mark_failed(self, session_id: str, job_id: str, result: str) -> None:
+        self._update(session_id, job_id, 'FAILED', result)

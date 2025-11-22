@@ -5,6 +5,7 @@ from datetime import datetime
 
 import boto3
 from anthropic import Anthropic
+from shared.job_model import JobHandler
 
 logger = logging.getLogger()
 logger.setLevel(logging.INFO)
@@ -27,7 +28,7 @@ jobs_table = dynamodb.Table(JOBS_TABLE_NAME)
 
 # Initialize Anthropic client
 anthropic = Anthropic(api_key=ANTHROPIC_API_KEY)
-
+job_handler = JobHandler(JOBS_TABLE_NAME)
 
 def handler(event, context):
     """
@@ -37,37 +38,36 @@ def handler(event, context):
     """
     logger.info(f"Market Research Orchestrator received event: {json.dumps(event)}")
 
-    try:
-        for record in event["Records"]:
+    for record in event["Records"]:
+        try:
             # Parse the SQS message
             message_body = json.loads(record["body"])
             job_id = message_body["job_id"]
+            session_id = message_body["session_id"]
+            
             instructions = message_body["instructions"]
+
+            job = job_handler.find_one(session_id=session_id, job_id=job_id)
+
+            if job.status != 'CREATED':
+                logger.warning(f"Job {job_id} in session {session_id} is not in CREATED status. Current status: {job.status}. Skipping.")
+                continue
 
             logger.info(f"Starting market research orchestration for job {job_id}")
 
-            # Update job status to processing
-            jobs_table.update_item(
-                Key={"id": job_id},
-                UpdateExpression=(
-                    "SET #status = :status, "
-                    "started_at = :started_at, "
-                    "updated_at = :updated_at"
-                ),
-                ExpressionAttributeNames={"#status": "status"},
-                ExpressionAttributeValues={
-                    ":status": "processing",
-                    ":started_at": datetime.utcnow().isoformat(),
-                    ":updated_at": datetime.utcnow().isoformat(),
-                },
-            )
+            job_handler.mark_in_progress(session_id=session_id, job_id=job_id)
 
             # Execute agents sequentially
             try:
                 # Agent 1: Obstacles
                 logger.info(f"Invoking Obstacles Agent for job {job_id}")
                 obstacles_response = invoke_agent(
-                    OBSTACLES_AGENT_NAME, {"job_id": job_id, "problem_context": instructions}
+                    OBSTACLES_AGENT_NAME,
+                    {
+                        'session_id': session_id,
+                        'job_id': job_id,
+                        'instructions': instructions,
+                    }
                 )
                 obstacles_findings = extract_findings(obstacles_response)
                 logger.info(f"Obstacles Agent completed for job {job_id}")
@@ -77,8 +77,9 @@ def handler(event, context):
                 solutions_response = invoke_agent(
                     SOLUTIONS_AGENT_NAME,
                     {
-                        "job_id": job_id,
-                        "problem_context": instructions,
+                        'session_id': session_id,
+                        'job_id': job_id,
+                        'instructions': instructions,
                         "obstacles_findings": obstacles_findings,
                     },
                 )
@@ -90,8 +91,9 @@ def handler(event, context):
                 legal_response = invoke_agent(
                     LEGAL_AGENT_NAME,
                     {
-                        "job_id": job_id,
-                        "problem_context": instructions,
+                        'session_id': session_id,
+                        'job_id': job_id,
+                        'instructions': instructions,
                         "obstacles_findings": obstacles_findings,
                         "solutions_findings": solutions_findings,
                     },
@@ -104,8 +106,9 @@ def handler(event, context):
                 competitor_response = invoke_agent(
                     COMPETITOR_AGENT_NAME,
                     {
-                        "job_id": job_id,
-                        "problem_context": instructions,
+                        'session_id': session_id,
+                        'job_id': job_id,
+                        'instructions': instructions,
                         "obstacles_findings": obstacles_findings,
                         "solutions_findings": solutions_findings,
                         "legal_findings": legal_findings,
@@ -119,8 +122,9 @@ def handler(event, context):
                 market_response = invoke_agent(
                     MARKET_AGENT_NAME,
                     {
-                        "job_id": job_id,
-                        "problem_context": instructions,
+                        'session_id': session_id,
+                        'job_id': job_id,
+                        'instructions': instructions,
                         "obstacles_findings": obstacles_findings,
                         "solutions_findings": solutions_findings,
                         "legal_findings": legal_findings,
@@ -143,7 +147,7 @@ def handler(event, context):
 
                 # Update job with final result
                 final_result = {
-                    "problem_context": instructions,
+                    "instructions": instructions,
                     "findings": {
                         "obstacles": obstacles_findings,
                         "solutions": solutions_findings,
@@ -155,21 +159,10 @@ def handler(event, context):
                     "completed_at": datetime.utcnow().isoformat(),
                 }
 
-                jobs_table.update_item(
-                    Key={"id": job_id},
-                    UpdateExpression=(
-                        "SET #status = :status, "
-                        "#result = :result, "
-                        "completed_at = :completed_at, "
-                        "updated_at = :updated_at"
-                    ),
-                    ExpressionAttributeNames={"#status": "status", "#result": "result"},
-                    ExpressionAttributeValues={
-                        ":status": "completed",
-                        ":result": json.dumps(final_result),
-                        ":completed_at": datetime.utcnow().isoformat(),
-                        ":updated_at": datetime.utcnow().isoformat(),
-                    },
+                job_handler.mark_completed(
+                    session_id=session_id,
+                    job_id=job_id,
+                    result=json.dumps(final_result)
                 )
 
                 logger.info(
@@ -181,28 +174,19 @@ def handler(event, context):
                     f"Agent execution failed for job {job_id}: {str(agent_error)}", exc_info=True
                 )
 
-                # Update job status to failed
-                jobs_table.update_item(
-                    Key={"id": job_id},
-                    UpdateExpression=(
-                        "SET #status = :status, "
-                        "error_message = :error, "
-                        "updated_at = :updated_at"
-                    ),
-                    ExpressionAttributeNames={"#status": "status"},
-                    ExpressionAttributeValues={
-                        ":status": "failed",
-                        ":error": str(agent_error),
-                        ":updated_at": datetime.utcnow().isoformat(),
-                    },
+                job_handler.mark_failed(
+                    session_id=session_id,
+                    job_id=job_id,
+                    result=str(agent_error)
                 )
+
                 raise
 
-        return {"statusCode": 200, "body": json.dumps("Successfully processed messages")}
+            return {"statusCode": 200, "body": json.dumps("Successfully processed messages")}
 
-    except Exception as e:
-        logger.error(f"Error in orchestrator: {str(e)}", exc_info=True)
-        raise
+        except Exception as e:
+            logger.error(f"Error in orchestrator: {str(e)}", exc_info=True)
+            raise
 
 
 def invoke_agent(function_name, payload):
