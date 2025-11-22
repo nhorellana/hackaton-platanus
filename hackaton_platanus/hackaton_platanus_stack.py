@@ -256,7 +256,8 @@ class HackatonPlatanusStack(Stack):
             description="Processes external research jobs",
             function_name="external_research_worker",
             environment={
-                "JOBS_TABLE_NAME": jobs_table.table_name
+                "JOBS_TABLE_NAME": jobs_table.table_name,
+                "ANTHROPIC_API_KEY": os.environ['ANTHROPIC_API_KEY']
             }
         )
 
@@ -264,10 +265,10 @@ class HackatonPlatanusStack(Stack):
         jobs_table.grant_read_write_data(slack_worker)
         jobs_table.grant_read_write_data(market_research_worker)
         jobs_table.grant_read_write_data(external_research_worker)
-        
+
         # Grant conversations table permissions to slack worker
         conversations_table.grant_read_write_data(slack_worker)
-        
+
         # Grant SQS permissions to slack worker for requeuing
         slack_queue.grant_send_messages(slack_worker)
 
