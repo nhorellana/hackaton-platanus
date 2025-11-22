@@ -1,21 +1,16 @@
 import json
 import logging
 import os
-from datetime import datetime
-
-import boto3
+from shared.job_model import JobHandler
 
 logger = logging.getLogger()
 logger.setLevel(logging.INFO)
-
-# Initialize AWS clients
-dynamodb = boto3.resource("dynamodb")
 
 # Get environment variables
 JOBS_TABLE_NAME = os.environ["JOBS_TABLE_NAME"]
 
 # Get table reference
-jobs_table = dynamodb.Table(JOBS_TABLE_NAME)
+job_handler = JobHandler(JOBS_TABLE_NAME)
 
 
 def handler(event, context):
@@ -24,70 +19,48 @@ def handler(event, context):
     """
     logger.info(f"Received event: {json.dumps(event)}")
 
-    try:
-        for record in event["Records"]:
+    for record in event["Records"]:
+        try:
             # Parse the SQS message
             message_body = json.loads(record["body"])
             job_id = message_body["job_id"]
-            instructions = message_body["instructions"]
+            session_id = message_body["session_id"]
+
+            job = job_handler.find_one(session_id=session_id, job_id=job_id)
+            if job is None:
+                logger.error(f"Job {job_id} not found in session {session_id}. Skipping.")
+                continue
+
+            job_handler.mark_in_progress(session_id=session_id, job_id=job_id)
 
             logger.info(f"Processing External Research job {job_id}")
 
-            # Update job status to processing
-            jobs_table.update_item(
-                Key={"id": job_id},
-                UpdateExpression=("SET #status = :status, updated_at = :updated_at"),
-                ExpressionAttributeNames={"#status": "status"},
-                ExpressionAttributeValues={
-                    ":status": "processing",
-                    ":updated_at": datetime.utcnow().isoformat(),
-                },
-            )
-
             # TODO: Add your external research logic here
             # For now, we'll simulate some work
-            result = process_external_research_job(instructions)
+            result = process_external_research_job(instructions=job.instructions)
 
-            # Update job with result
-            jobs_table.update_item(
-                Key={"id": job_id},
-                UpdateExpression=(
-                    "SET #status = :status, " "#result = :result, " "updated_at = :updated_at"
-                ),
-                ExpressionAttributeNames={"#status": "status", "#result": "result"},
-                ExpressionAttributeValues={
-                    ":status": "completed",
-                    ":result": result,
-                    ":updated_at": datetime.utcnow().isoformat(),
-                },
+            job_handler.mark_completed(
+                session_id=session_id,
+                job_id=job_id,
+                result=result,
             )
 
             logger.info(f"Completed External Research job {job_id}")
 
-        return {"statusCode": 200, "body": json.dumps("Successfully processed messages")}
+        except Exception as e:
+            logger.error(
+                f"Agent execution failed for job {job_id}: {str(e)}", exc_info=True
+            )
 
-    except Exception as e:
-        logger.error(f"Error processing External Research job: {str(e)}", exc_info=True)
+            job_handler.mark_failed(
+                session_id=session_id,
+                job_id=job_id,
+                result=str(e)
+            )
 
-        # Try to update job status to failed
-        if "job_id" in locals():
-            try:
-                jobs_table.update_item(
-                    Key={"id": job_id},
-                    UpdateExpression=(
-                        "SET #status = :status, " "#result = :result, " "updated_at = :updated_at"
-                    ),
-                    ExpressionAttributeNames={"#status": "status", "#result": "result"},
-                    ExpressionAttributeValues={
-                        ":status": "failed",
-                        ":result": f"Error: {str(e)}",
-                        ":updated_at": datetime.utcnow().isoformat(),
-                    },
-                )
-            except Exception as update_error:
-                logger.error(f"Failed to update job status: {str(update_error)}")
-
-        raise
+            raise
+    
+    return {"statusCode": 200, "body": json.dumps("Successfully processed messages")}
 
 
 def process_external_research_job(instructions):
