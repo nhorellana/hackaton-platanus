@@ -13,8 +13,8 @@ export default function Home() {
 
   const actions = useMemo(() => [
     { text: "valida tu hipótesis", color: "text-blue-400" },
-    { text: "encuentra el problema real", color: "text-emerald-400" },
-    { text: "investiga a fondo", color: "text-purple-400" }
+    { text: "descubre el dolor real", color: "text-emerald-400" },
+    { text: "compara soluciones", color: "text-purple-400" }
   ], []);
 
   useEffect(() => {
@@ -61,15 +61,15 @@ export default function Home() {
   return (
     <div className="flex min-h-screen items-center justify-center bg-(--color-background) px-4">
       <main className="flex w-full max-w-3xl flex-col items-center text-center">
-        <h1 className="mb-4 min-h-[2.5em] text-5xl font-semibold tracking-tight text-(--color-text) md:min-h-[2.5em] md:text-6xl lg:min-h-[2.5em] lg:text-7xl">
-          Profundiza y{" "}
+        <h1 className="mb-4 min-h-[2.5em] text-4xl font-semibold tracking-tight text-(--color-text) md:text-6xl lg:text-7xl">
+          MarkIA y{" "}
           <span className={`${actions[currentActionIndex].color} transition-colors duration-300`}>
             {text}
             <span className="animate-pulse">|</span>
           </span>
         </h1>
         <p className="mb-12 text-lg text-(--color-text-secondary) md:text-xl">
-          No te quedes en la superficie. Descubre qué es lo que realmente necesitas resolver
+          Resolver el problema equivocado sale carísimo: compara, investiga y confirma.
         </p>
 
         <div className="w-full max-w-xl">
