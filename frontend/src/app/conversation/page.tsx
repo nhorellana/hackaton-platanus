@@ -16,7 +16,6 @@ export default function Conversation() {
     const messagesEndRef = useRef<HTMLDivElement>(null);
     const hasInitialized = useRef(false);
 
-    // Load messages from localStorage on mount and check for initial message
     useEffect(() => {
         if (hasInitialized.current) return;
         hasInitialized.current = true;
@@ -34,7 +33,6 @@ export default function Conversation() {
         }
     }, []);
 
-    // Save messages to localStorage whenever they change
     useEffect(() => {
         if (messages.length > 0) {
             localStorage.setItem('conversation-messages', JSON.stringify(messages));
@@ -54,8 +52,7 @@ export default function Conversation() {
         setIsLoading(true);
 
         try {
-            // TODO: Replace with actual API call to /test endpoint
-            const response = await fetch('/test', {
+            const response = await fetch('/chat', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
@@ -70,15 +67,14 @@ export default function Conversation() {
             const data = await response.json();
             const assistantMessage: Message = {
                 role: 'assistant',
-                content: data.response || 'This is a placeholder response. Connect the /test endpoint to see real responses.'
+                content: data.response || 'This is a placeholder response. Connect the /chat endpoint to see real responses.'
             };
             setMessages(prev => [...prev, assistantMessage]);
         } catch (error) {
             console.error('Error sending message:', error);
-            // Placeholder response for now
             const assistantMessage: Message = {
                 role: 'assistant',
-                content: 'This is a placeholder response. Connect the /test endpoint to see real responses.'
+                content: 'This is a placeholder response. Connect the /chat endpoint to see real responses.'
             };
             setMessages(prev => [...prev, assistantMessage]);
         } finally {
@@ -96,6 +92,30 @@ export default function Conversation() {
         localStorage.removeItem('conversation-messages');
     };
 
+    const handleCreateJobs = async () => {
+        try {
+            const response = await fetch('/jobs', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ message: messages[0]?.content || '' }),
+            });
+
+            if (response.ok) {
+                const data = await response.json();
+                localStorage.setItem('current-jobs', JSON.stringify(data.jobs));
+                router.push('/jobs');
+            } else {
+                console.error('Failed to create jobs');
+                router.push('/jobs');
+            }
+        } catch (error) {
+            console.error('Error creating jobs:', error);
+            router.push('/jobs');
+        }
+    };
+
     return (
         <div className="flex min-h-screen flex-col bg-(--color-background)">
             {/* Header */}
@@ -105,7 +125,7 @@ export default function Conversation() {
                         onClick={() => router.push('/')}
                         className="cursor-pointer text-sm text-(--color-text-secondary) transition-colors hover:text-(--color-text)"
                     >
-                        ← Back
+                        ← Volver al inicio
                     </button>
                     <h1 className="text-lg font-semibold text-(--color-text)">AI Conversation</h1>
                     <button
@@ -167,7 +187,7 @@ export default function Conversation() {
             <button
                 type="button"
                 className="w-64 mb-8 mx-auto rounded-md bg-(--color-primary) px-6 py-2 text-sm font-medium text-white transition-colors hover:bg-(--color-primary-hover) disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
-                onClick={() => router.push('/jobs')}
+                onClick={handleCreateJobs}
             >
                 Encontré el problema
             </button>
@@ -187,10 +207,10 @@ export default function Conversation() {
                             />
                             <button
                                 type="submit"
-                                className="absolute right-2 rounded-md bg-(--color-primary) px-6 py-2 text-sm font-medium text-white transition-colors hover:bg-(--color-primary-hover) disabled:opacity-50 disabled:cursor-not-allowed"
+                                className="absolute cursor-pointer right-2 rounded-md bg-(--color-primary) px-6 py-2 text-sm font-medium text-white transition-colors hover:bg-(--color-primary-hover) disabled:opacity-50 disabled:cursor-not-allowed"
                                 disabled={isLoading || !inputValue.trim()}
                             >
-                                Send
+                                Enviar
                             </button>
                         </div>
                     </form>
