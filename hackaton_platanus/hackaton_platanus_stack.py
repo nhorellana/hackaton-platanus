@@ -95,6 +95,21 @@ class HackatonPlatanusStack(Stack):
             }
         )
 
+        summarize_lambda = _lambda.Function(
+            self, "SummarizeFunction",
+            runtime=_lambda.Runtime.PYTHON_3_11,
+            handler="summarize.handler",
+            code=_lambda.Code.from_asset(lambda_code_path),
+            timeout=Duration.seconds(300),
+            memory_size=256,
+            description="Summarize Lambda that summarizes job results",
+            function_name="summarize",
+            environment={
+                "ANTHROPIC_API_KEY": os.environ['ANTHROPIC_API_KEY'],
+                "JOBS_TABLE_NAME": jobs_table.table_name
+            }
+        )
+
         # Define the Orchestrator Lambda function
         orchestrator_lambda = _lambda.Function(
             self, "OrchestratorFunction",
@@ -118,6 +133,7 @@ class HackatonPlatanusStack(Stack):
 
         # Grant permissions to orchestrator
         problem_queue.grant_send_messages(problem_lambda)
+        jobs_table.grant_read_write_data(summarize_lambda)
         jobs_table.grant_write_data(orchestrator_lambda)
         slack_queue.grant_send_messages(orchestrator_lambda)
         market_research_queue.grant_send_messages(orchestrator_lambda)
@@ -423,6 +439,21 @@ class HackatonPlatanusStack(Stack):
 
         # Add CORS support for /chat
         chat_resource.add_cors_preflight(
+            allow_origins=["*"],
+            allow_methods=["POST", "OPTIONS"],
+            allow_headers=["Content-Type", "Authorization"]
+        )
+
+        # Add POST method to /summarize endpoint
+        summarize_integration = apigateway.LambdaIntegration(
+            summarize_lambda,
+            proxy=True
+        )
+        summarize_resource = api.root.add_resource("summarize")
+        summarize_resource.add_method("POST", summarize_integration)
+
+        # Add CORS support for /summarize
+        summarize_resource.add_cors_preflight(
             allow_origins=["*"],
             allow_methods=["POST", "OPTIONS"],
             allow_headers=["Content-Type", "Authorization"]
