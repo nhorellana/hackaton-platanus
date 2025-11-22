@@ -368,13 +368,21 @@ class HackatonPlatanusStack(Stack):
             description="Get jobs for a session Lambda",
             function_name="get_jobs",
             environment={
-                "JOBS_TABLE_NAME": jobs_table.table_name
+                "JOBS_TABLE_NAME": jobs_table.table_name,
+                "SLACK_QUEUE_URL": slack_queue.queue_url,
+                "MARKET_RESEARCH_QUEUE_URL": market_research_queue.queue_url,
+                "EXTERNAL_RESEARCH_QUEUE_URL": (
+                    external_research_queue.queue_url
+                ),
             }
         )
 
         # Grant DynamoDB read permissions to get_job_status lambda
         jobs_table.grant_read_data(get_job_status_lambda)
         jobs_table.grant_read_data(get_jobs_lambda)
+        slack_queue.grant_send_messages(orchestrator_lambda)
+        market_research_queue.grant_send_messages(orchestrator_lambda)
+        external_research_queue.grant_send_messages(orchestrator_lambda)
 
         # Create API Gateway REST API
         api = apigateway.RestApi(

@@ -10,14 +10,23 @@ logger = logging.getLogger()
 logger.setLevel(logging.INFO)
 
 # Initialize AWS clients
-dynamodb = boto3.resource('dynamodb')
+sqs = boto3.client("sqs")
 
 # Get environment variables
 JOBS_TABLE_NAME = os.environ['JOBS_TABLE_NAME']
+SLACK_QUEUE_URL = os.environ["SLACK_QUEUE_URL"]
+MARKET_RESEARCH_QUEUE_URL = os.environ["MARKET_RESEARCH_QUEUE_URL"]
+EXTERNAL_RESEARCH_QUEUE_URL = os.environ["EXTERNAL_RESEARCH_QUEUE_URL"]
 
-# Get table reference
-jobs_table = dynamodb.Table(JOBS_TABLE_NAME)
+# Get environment variables
+JOBS_TABLE_NAME = os.environ["JOBS_TABLE_NAME"]
 
+# --- SQS MAPPING ---
+SQS_MAPPING = {
+    "slack": SLACK_QUEUE_URL,  # Internal Data Audit requires internal contact (Slack)
+    "research": MARKET_RESEARCH_QUEUE_URL,  # External Context requires Market Research
+    "external_research": EXTERNAL_RESEARCH_QUEUE_URL,  # External Experts requires External Research
+}
 
 def handler(event, context):
     '''
@@ -48,6 +57,25 @@ def handler(event, context):
 
         # Get job from DynamoDB
         jobs = JobHandler(JOBS_TABLE_NAME).find(session_id)
+
+        for job_item in jobs:
+            if job_item.status in ['COMPLETED', 'FAILED']:
+                continue
+
+            queue_url = SQS_MAPPING.get(job_item.job_type)
+
+            if queue_url:
+                message_body = {
+                    'job_id': job_item.id,
+                }
+
+                sqs.send_message(
+                    QueueUrl=queue_url,
+                    MessageBody=json.dumps(message_body)
+                )
+                logger.info(f"Sent message for job {job_item.id} to {job_item.job_type} queue")
+            else:
+                logger.warning(f"Job {job_item.id} activated but no SQS URL found in map.")
 
         return {
             'statusCode': 200,
