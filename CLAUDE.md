@@ -22,24 +22,80 @@ source .venv/bin/activate
 # Install dependencies
 pip install -r requirements.txt
 pip install -r requirements-dev.txt
+
+# Install pre-commit hooks
+pre-commit install
+```
+
+### Code Formatting
+
+The project uses automated formatting tools:
+- **Black** - Code formatter (100 char line length)
+- **isort** - Import sorter
+- **flake8** - Linter
+- **pre-commit** - Git hooks for automatic formatting
+
+```bash
+# Format code
+make format
+
+# Run linter
+make lint
+
+# Run pre-commit on all files
+make pre-commit
+
+# Or use directly
+black .
+isort .
+flake8 .
+```
+
+### Common Commands (Makefile)
+
+```bash
+# Show all available commands
+make help
+
+# Install dependencies and setup pre-commit
+make install
+
+# Format code with black and isort
+make format
+
+# Run linters
+make lint
+
+# Run tests
+make test
+
+# Build Lambda layer
+make layer
+
+# Deploy to AWS
+make deploy
 ```
 
 ### AWS CDK Commands
 ```bash
 # Synthesize CloudFormation template
 cdk synth
+# Or: make synth
 
 # List all stacks
 cdk ls
 
 # Deploy to AWS (account: 306679357471, region: us-east-1)
 cdk deploy
+# Or: make deploy
 
 # Compare deployed stack with current state
 cdk diff
+# Or: make diff
 
 # Destroy stack
 cdk destroy
+# Or: make destroy
 ```
 
 ## Architecture
