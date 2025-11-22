@@ -150,111 +150,113 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
     """
     logger.info(f"Received event: {json.dumps(event)}")
 
-    try:
-        # 1. Input Parsing and Validation
-        body = event.get('body', event)
-        if isinstance(body, str):
-            body = json.loads(body)
+    for record in event['Records']:
+        try:
+            # 1. Input Parsing and Validation
+            body = json.loads(record['body'])
+            if isinstance(body, str):
+                body = json.loads(body)
 
-        full_declaration = body.get('full_problem_declaration')
+            full_declaration = body.get('full_problem_declaration')
+            session_id = body.get('session_id')
 
-        # Always use organization diagram as internal memory (client onboarding simulation)
-        organization_data = get_organization_registry()
-        internal_registry = json.dumps(organization_data, indent=2) if organization_data else "No internal registry data available"
+            # Always use organization diagram as internal memory (client onboarding simulation)
+            organization_data = get_organization_registry()
+            internal_registry = json.dumps(organization_data, indent=2) if organization_data else "No internal registry data available"
 
-        logger.info(f"Using organization data for {len(organization_data)} people from internal registry")
+            logger.info(f"{session_id} Using organization data for {len(organization_data)} people from internal registry")
 
-        if not full_declaration:
+            if not full_declaration:
+                return {
+                    'statusCode': 400,
+                    'headers': {'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*'},
+                    'body': json.dumps({'error': 'Missing required parameter: full_problem_declaration'})
+                }
+
+            # 2. Construct the User Prompt Content and API Payload
+            USER_PROMPT = f'''
+                Analyze the following project problem declaration and the internal company registry data to generate the complete execution order.
+
+                --- FULL PROBLEM DECLARATION (CONTEXT):
+                {full_declaration}
+
+                --- INTERNAL REGISTRY DATA (FOR CONTACT MAPPING):
+                {internal_registry}
+
+                Proceed with the 3-step analysis (Classification, Activation Logic, Content Generation) and return the output STRICTLY in the required JSON schema.
+            '''
+
+            # 3. Execute the AI Orchestration
+            orchestrated_result = call_anthropic_with_jobs(SYSTEM_INSTRUCTION, USER_PROMPT)
+
+            # 4. Job Persistence (DynamoDB) and SQS Fan-Out Execution
+            triggered_jobs = []
+
+            if not orchestrated_result or 'detail_execution' not in orchestrated_result:
+                raise Exception("AI orchestration failed to return a valid execution plan.")
+
+            detail_execution = orchestrated_result['detail_execution']
+            context_summary = orchestrated_result['analysis_ia']['problem_summary']
+            current_time = datetime.utcnow().isoformat()
+
+            # We iterate over the expected keys (ADI, ECG, VEE)
+            for job_key, job_payload in detail_execution.items():
+                if job_payload.get('activate') is True:
+                    queue_url = SQS_MAPPING.get(job_key)
+
+                    if queue_url:
+                        job_item = JobModel(
+                            status='CREATED',
+                            job_type=job_key,
+                            instructions=json.dumps(job_payload),
+                            context_summary=context_summary,
+                            created_at=current_time,
+                            updated_at=current_time
+                        )
+
+                        JobHandler(JOBS_TABLE_NAME).create(job=job_item)
+
+                        logger.info(f"Created job {job_item.id} ({job_key}) in DynamoDB")
+
+                        # B) SQS FAN-OUT: Send the job ID and type to the execution queue
+                        message_body = {
+                            'job_id': job_item.id,
+                        }
+
+                        sqs.send_message(
+                            QueueUrl=queue_url,
+                            MessageBody=json.dumps(message_body)
+                        )
+                        logger.info(f"Sent message for job {job_item.id} to {job_key} queue")
+
+                        triggered_jobs.append(job_item.__dict__)
+                    else:
+                        logger.warning(f"Job {job_key} activated but no SQS URL found in map.")
+
+            # 5. Return the Fan-Out Status
+            response = {
+                'statusCode': 200,
+                'headers': {'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*'},
+                'body': json.dumps({
+                    'message': 'Orchestration complete. Jobs persisted and fanned out to SQS queues.',
+                    'jobs': triggered_jobs,
+                    'classification_scores': orchestrated_result['analysis_ia']['classification_scores']
+                })
+            }
+            logger.info(f"Successfully created {len(triggered_jobs)} jobs")
+            return response
+
+        except json.JSONDecodeError as e:
+            logger.error(f"Invalid JSON in request body: {str(e)}")
             return {
                 'statusCode': 400,
                 'headers': {'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*'},
-                'body': json.dumps({'error': 'Missing required parameter: full_problem_declaration'})
+                'body': json.dumps({'error': 'Invalid JSON', 'message': str(e)})
             }
-
-        # 2. Construct the User Prompt Content and API Payload
-        USER_PROMPT = f'''
-            Analyze the following project problem declaration and the internal company registry data to generate the complete execution order.
-
-            --- FULL PROBLEM DECLARATION (CONTEXT):
-            {full_declaration}
-
-            --- INTERNAL REGISTRY DATA (FOR CONTACT MAPPING):
-            {internal_registry}
-
-            Proceed with the 3-step analysis (Classification, Activation Logic, Content Generation) and return the output STRICTLY in the required JSON schema.
-        '''
-
-        # 3. Execute the AI Orchestration
-        orchestrated_result = call_anthropic_with_jobs(SYSTEM_INSTRUCTION, USER_PROMPT)
-
-        # 4. Job Persistence (DynamoDB) and SQS Fan-Out Execution
-        triggered_jobs = []
-
-        if not orchestrated_result or 'detail_execution' not in orchestrated_result:
-            raise Exception("AI orchestration failed to return a valid execution plan.")
-
-        detail_execution = orchestrated_result['detail_execution']
-        context_summary = orchestrated_result['analysis_ia']['problem_summary']
-        current_time = datetime.utcnow().isoformat()
-
-        # We iterate over the expected keys (ADI, ECG, VEE)
-        for job_key, job_payload in detail_execution.items():
-            if job_payload.get('activate') is True:
-                queue_url = SQS_MAPPING.get(job_key)
-
-                if queue_url:
-                    job_item = JobModel(
-                        status='CREATED',
-                        job_type=job_key,
-                        instructions=json.dumps(job_payload),
-                        context_summary=context_summary,
-                        created_at=current_time,
-                        updated_at=current_time
-                    )
-
-                    JobHandler(JOBS_TABLE_NAME).create(job=job_item)
-
-                    logger.info(f"Created job {job_item.id} ({job_key}) in DynamoDB")
-
-                    # B) SQS FAN-OUT: Send the job ID and type to the execution queue
-                    message_body = {
-                        'job_id': job_item.id,
-                    }
-
-                    sqs.send_message(
-                        QueueUrl=queue_url,
-                        MessageBody=json.dumps(message_body)
-                    )
-                    logger.info(f"Sent message for job {job_item.id} to {job_key} queue")
-
-                    triggered_jobs.append(job_item.__dict__)
-                else:
-                    logger.warning(f"Job {job_key} activated but no SQS URL found in map.")
-
-        # 5. Return the Fan-Out Status
-        response = {
-            'statusCode': 200,
-            'headers': {'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*'},
-            'body': json.dumps({
-                'message': 'Orchestration complete. Jobs persisted and fanned out to SQS queues.',
-                'jobs': triggered_jobs,
-                'classification_scores': orchestrated_result['analysis_ia']['classification_scores']
-            })
-        }
-        logger.info(f"Successfully created {len(triggered_jobs)} jobs")
-        return response
-
-    except json.JSONDecodeError as e:
-        logger.error(f"Invalid JSON in request body: {str(e)}")
-        return {
-            'statusCode': 400,
-            'headers': {'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*'},
-            'body': json.dumps({'error': 'Invalid JSON', 'message': str(e)})
-        }
-    except Exception as e:
-        logger.error(f"Error processing request: {str(e)}", exc_info=True)
-        return {
-            'statusCode': 500,
-            'headers': {'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*'},
-            'body': json.dumps({'error': 'Internal server error', 'message': str(e)})
-        }
+        except Exception as e:
+            logger.error(f"Error processing request: {str(e)}", exc_info=True)
+            return {
+                'statusCode': 500,
+                'headers': {'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*'},
+                'body': json.dumps({'error': 'Internal server error', 'message': str(e)})
+            }
