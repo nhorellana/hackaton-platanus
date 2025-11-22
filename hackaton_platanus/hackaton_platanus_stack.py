@@ -35,7 +35,20 @@ class HackatonPlatanusStack(Stack):
             point_in_time_recovery=True
         )
 
-        # Create SQS Queues (increased visibility timeout for 15min Lambda execution)
+        # Create DynamoDB table for conversations
+        conversations_table = dynamodb.Table(
+            self, "ConversationsTable",
+            table_name="conversations",
+            partition_key=dynamodb.Attribute(
+                name="jobId",
+                type=dynamodb.AttributeType.STRING
+            ),
+            billing_mode=dynamodb.BillingMode.PAY_PER_REQUEST,
+            removal_policy=RemovalPolicy.DESTROY,
+            point_in_time_recovery=True
+        )
+
+        # Create SQS Queues
         slack_queue = sqs.Queue(
             self, "SlackQueue",
             queue_name="slack",
@@ -73,7 +86,8 @@ class HackatonPlatanusStack(Stack):
                 "MARKET_RESEARCH_QUEUE_URL": market_research_queue.queue_url,
                 "EXTERNAL_RESEARCH_QUEUE_URL": (
                     external_research_queue.queue_url
-                )
+                ),
+                "ANTHROPIC_API_KEY": "Llenar con la key"  # Replace with actual key or use Secrets Manager
             }
         )
 
@@ -183,14 +197,19 @@ class HackatonPlatanusStack(Stack):
         slack_worker = _lambda.Function(
             self, "SlackWorker",
             runtime=_lambda.Runtime.PYTHON_3_11,
-            handler="slack_worker.handler",
+            handler="slack_worker.lambda_handler",
             code=_lambda.Code.from_asset(lambda_code_path),
             timeout=Duration.seconds(900),  # 15 minutes
             memory_size=1024,  # 1GB
             description="Processes Slack jobs",
             function_name="slack_worker",
             environment={
-                "JOBS_TABLE_NAME": jobs_table.table_name
+                "JOBS_TABLE_NAME": jobs_table.table_name,
+                "CONVERSATIONS_TABLE_NAME": conversations_table.table_name,
+                "SLACK_QUEUE_URL": slack_queue.queue_url,
+                # These should be set via environment variables or AWS Secrets Manager
+                "SLACK_BOT_TOKEN": os.environ.get("SLACK_BOT_TOKEN", ""),
+                "ANTHROPIC_API_KEY": os.environ.get("ANTHROPIC_API_KEY", "")
             }
         )
 
@@ -233,6 +252,12 @@ class HackatonPlatanusStack(Stack):
         jobs_table.grant_read_write_data(slack_worker)
         jobs_table.grant_read_write_data(market_research_worker)
         jobs_table.grant_read_write_data(external_research_worker)
+        
+        # Grant conversations table permissions to slack worker
+        conversations_table.grant_read_write_data(slack_worker)
+        
+        # Grant SQS permissions to slack worker for requeuing
+        slack_queue.grant_send_messages(slack_worker)
 
         # Grant market_research_worker permission to invoke agent lambdas
         obstacles_agent.grant_invoke(market_research_worker)
@@ -454,4 +479,10 @@ class HackatonPlatanusStack(Stack):
             self, "ChatFunctionName",
             value=chat_lambda.function_name,
             description="Chat Lambda function name"
+        )
+
+        CfnOutput(
+            self, "ConversationsTableName",
+            value=conversations_table.table_name,
+            description="Conversations DynamoDB table name"
         )
