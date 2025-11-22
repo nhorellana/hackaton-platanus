@@ -54,4 +54,6 @@ command.
 - `cdk diff` compare deployed stack with current state
 - `cdk docs` open CDK documentation
 
+cdk deploy --all --region us-east-1 --require-approval never --concurrency 8
+
 Enjoy!
