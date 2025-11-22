@@ -56,18 +56,19 @@ def handler(event, context):
             context_summary = instructions.get('context_summary', job.context_summary)
 
             # Update job status to IN_PROGRESS
-            job.status = 'IN_PROGRESS'
-            job.updated_at = datetime.utcnow().isoformat()
-            job_handler.update(job)
+
+            job_handler._update(
+
+            )
 
             # Conduct external expert search
             research_results = conduct_expert_search(expert_profile, questions, context_summary)
 
-            # Update job with results
-            job.result = json.dumps(research_results, ensure_ascii=False)
-            job.status = 'COMPLETED'
-            job.updated_at = datetime.utcnow().isoformat()
-            job_handler.update(job)
+            job_handler.mark_completed(
+                session_id=session_id,
+                job_id=job_id,
+                result=json.dumps(research_results, ensure_ascii=False)
+            )
 
             logger.info(f'Successfully completed external research job {job_id}')
 

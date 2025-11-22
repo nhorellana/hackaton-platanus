@@ -42,7 +42,7 @@ class JobHandler:
         if item:
             return JobModel(**item)
         return None
-        
+
     def _update(
         self,
         session_id: str,
@@ -74,7 +74,7 @@ class JobHandler:
             ExpressionAttributeNames=expression_attribute_names,
             ExpressionAttributeValues=expression_attribute_values
         )
-    
+
     def mark_in_progress(self, session_id: str, job_id: str, result: str | None = None) -> None:
         self._update(session_id, job_id, 'IN_PROGRESS', result)
 
@@ -83,7 +83,3 @@ class JobHandler:
 
     def mark_failed(self, session_id: str, job_id: str, result: str) -> None:
         self._update(session_id, job_id, 'FAILED', result)
-
-    def update(self, job: JobModel) -> None:
-        """Update a job using the job object."""
-        self.jobs_table.put_item(Item=job.__dict__)
