@@ -20,6 +20,7 @@ export default function Conversation() {
     const [showModal, setShowModal] = useState(false);
     const [synthesisMessage, setSynthesisMessage] = useState("");
     const [editableSynthesis, setEditableSynthesis] = useState("");
+    const [temperature, setTemperature] = useState(0);
     const messagesEndRef = useRef<HTMLDivElement>(null);
     const hasInitialized = useRef(false);
 
@@ -53,6 +54,11 @@ export default function Conversation() {
 
             if (data.session_id && !sessionId) {
                 setSessionId(data.session_id);
+            }
+
+            // Update temperature from response
+            if (data.temperature !== undefined) {
+                setTemperature(data.temperature);
             }
 
             // Parse the message field which contains JSON
@@ -197,6 +203,7 @@ export default function Conversation() {
 
     const handleCreateJobs = async () => {
         try {
+            setIsLoading(true);
             const problemDeclaration = editableSynthesis || synthesisMessage || '';
 
             const controller = new AbortController();
@@ -216,14 +223,17 @@ export default function Conversation() {
             if (response.ok) {
                 const data = await response.json();
                 localStorage.setItem('current-jobs', JSON.stringify(data.jobs));
+                setIsLoading(false);
                 router.push('/jobs');
             } else {
                 console.error('Failed to create jobs');
+                setIsLoading(false);
                 router.push('/jobs');
             }
         } catch (error) {
             console.error('Error creating jobs:', error);
             router.push('/jobs');
+            setIsLoading(false);
         }
     };
 
@@ -308,16 +318,16 @@ export default function Conversation() {
                     type="button"
                     className="w-72 mb-8 mx-auto rounded-md bg-(--color-primary) px-6 py-2 text-sm font-medium text-white transition-colors hover:bg-(--color-primary-hover) disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer relative overflow-hidden"
                     onClick={handleSynthesizeConversation}
-                    disabled={isLoading || messages.length < 10}
+                    disabled={false}
                 >
                     <div
                         className="absolute inset-0 bg-white/20 transition-all duration-300"
-                        style={{ width: `${Math.min((messages.length / 10) * 100, 100)}%` }}
+                        style={{ width: `${Math.min((temperature / 10) * 100, 100)}%` }}
                     />
                     <span className="relative z-10">
-                        {messages.length >= 10
+                        {temperature >= 7
                             ? "Ayúdame a encontrar el problema"
-                            : `Progreso ${messages.length}/10`}
+                            : `Progreso ${temperature}/10`}
                     </span>
                 </button>
             )}
@@ -337,9 +347,15 @@ export default function Conversation() {
                             />
                             <button
                                 type="submit"
-                                className="absolute cursor-pointer right-2 rounded-md bg-(--color-primary) px-6 py-2 text-sm font-medium text-white transition-colors hover:bg-(--color-primary-hover) disabled:opacity-50 disabled:cursor-not-allowed"
+                                className="absolute cursor-pointer right-2 rounded-md bg-(--color-primary) px-6 py-2 text-sm font-medium text-white transition-colors hover:bg-(--color-primary-hover) disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
                                 disabled={isLoading || !inputValue.trim()}
                             >
+                                {isLoading && (
+                                    <svg className="animate-spin h-4 w-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                                    </svg>
+                                )}
                                 Enviar
                             </button>
                         </div>
@@ -368,8 +384,14 @@ export default function Conversation() {
                             </button>
                             <button
                                 onClick={handleCreateJobs}
-                                className="cursor-pointer rounded-md bg-(--color-primary) px-6 py-2 text-sm font-medium text-white transition-colors hover:bg-(--color-primary-hover)"
+                                className="cursor-pointer rounded-md bg-(--color-primary) px-6 py-2 text-sm font-medium text-white transition-colors hover:bg-(--color-primary-hover) flex items-center gap-2"
                             >
+                                {isLoading && (
+                                    <svg className="animate-spin h-4 w-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                                    </svg>
+                                )}
                                 Continuar
                             </button>
                         </div>

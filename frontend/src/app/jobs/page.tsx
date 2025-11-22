@@ -213,8 +213,14 @@ export default function Jobs() {
                     <button
                         onClick={handleGenerateSummary}
                         disabled={isGeneratingSummary || jobs.length === 0}
-                        className="cursor-pointer rounded-md bg-(--color-primary) px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-(--color-primary-hover) disabled:opacity-50 disabled:cursor-not-allowed"
+                        className="cursor-pointer rounded-md bg-(--color-primary) px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-(--color-primary-hover) disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
                     >
+                        {isGeneratingSummary && (
+                            <svg className="animate-spin h-4 w-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                            </svg>
+                        )}
                         {isGeneratingSummary ? 'Generando...' : 'Generar Resumen'}
                     </button>
                 </div>
@@ -228,9 +234,8 @@ export default function Jobs() {
                         <h2 className="mb-4 text-xs font-medium uppercase tracking-wider text-(--color-text-secondary)">
                             Trabajos en Curso
                         </h2>
-                        <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-4">
-                            {isLoading ? (
-                                // Skeleton loaders
+                        <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-1">
+                            {isLoading || jobs.length === 0 ? (
                                 <>
                                     {[1, 2, 3, 4].map((i) => (
                                         <div
