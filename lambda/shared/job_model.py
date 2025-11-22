@@ -2,6 +2,7 @@ from dataclasses import dataclass
 from typing import Literal
 import boto3
 import uuid
+from datetime import datetime
 
 dynamodb = boto3.resource('dynamodb')
 
@@ -52,7 +53,7 @@ class JobHandler:
         update_expression = 'SET #status = :status, updated_at = :updated_at'
         expression_attribute_values = {
             ':status': status,
-            ':updated_at': boto3.dynamodb.conditions.Attr('updated_at').default_value
+            ':updated_at': datetime.utcnow().isoformat(),
         }
         expression_attribute_names = {
             '#status': 'status',
