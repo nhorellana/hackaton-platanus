@@ -101,18 +101,33 @@ export default function Jobs() {
 
         const interval = setInterval(async () => {
             try {
-                const jobIds = pendingJobs.map(job => job.job_id);
-                const response = await fetch(`/jobs?ids=${jobIds.join(',')}`);
+                const updatedJobsPromises = pendingJobs.map(async (job) => {
+                    try {
+                        const response = await fetch(`/jobs/${job.job_id}`);
+                        if (response.ok) {
+                            return await response.json();
+                        }
+                        return null;
+                    } catch (error) {
+                        console.error(`Error fetching job ${job.job_id}:`, error);
+                        return null;
+                    }
+                });
 
-                if (response.ok) {
-                    const updatedJobs = await response.json();
+                const updatedJobsResults = await Promise.all(updatedJobsPromises);
+                const updatedJobs = updatedJobsResults.filter(job => job !== null);
+
+                if (updatedJobs.length > 0) {
                     setJobs(prevJobs =>
                         prevJobs.map(job => {
                             const updated = updatedJobs.find((uj: Job) => uj.job_id === job.job_id);
                             return updated || job;
                         })
                     );
-                    localStorage.setItem('current-jobs', JSON.stringify(updatedJobs));
+                    setJobs(prevJobs => {
+                        localStorage.setItem('current-jobs', JSON.stringify(prevJobs));
+                        return prevJobs;
+                    });
                 }
             } catch (error) {
                 console.error('Error polling job status:', error);
