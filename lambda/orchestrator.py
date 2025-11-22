@@ -102,9 +102,9 @@ Analyze the provided FULL_PROBLEM_DECLARATION and the INTERNAL_REGISTRY_DATA.
 
 [1] CLASSIFICATION: Assign a score of 1 (Low) to 5 (High) for the three knowledge needs based ONLY on the input text.
 [2] ACTIVATION LOGIC: Use the following thresholds to set the 'activate' boolean within each module's detail:
-   - slack: Activate if the problem is internal, operational, or financial and requires specific company metrics (Score 4 or higher).
+   - slack: Activate if the problem is internal, operational, or financial and requires specific company metrics (Score 3 or higher).
    - research: Activate if the problem involves market trends, competitor behavior, or general industry feasibility (Score 3 or higher).
-   - external_research: Activate only if the problem is highly technical, legal, or specialized (e.g., Blockchain, AI, new regulation) requiring external validation of viability (Score 5).
+   - external_research: Activate only if the problem is highly technical, legal, or specialized (e.g., Blockchain, AI, new regulation) requiring external validation not available on our team of viability (Score 3).
 
 [3] CONTENT GENERATION: For every activated module, generate the full content details:
    - slack: Analyze the INTERNAL_REGISTRY_DATA to identify the most relevant people to contact. Select 2-3 specific individuals whose roles, project experience, or expertise align with the problem. For each person, include: name, email, role, justification for selection based on their projects/expertise, and 2-3 specific questions or data points to request from them.
@@ -134,6 +134,8 @@ def call_anthropic_with_jobs(system: str, user_prompt: str) -> Dict[str, Any]:
             system=system,
             tools=get_orchestrator_job_schema()
         )
+
+        print("orchestration result:", result)
 
         return result
 
@@ -221,7 +223,7 @@ def handler(event: Dict[str, Any], context: Any):
 
                         # B) SQS FAN-OUT: Send the job ID and type to the execution queue
                         message_body = {
-                            'job_id': job_item.id,
+                            'job': job_item.__dict__,
                         }
 
                         sqs.send_message(
