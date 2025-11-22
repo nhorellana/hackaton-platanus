@@ -3,7 +3,7 @@
 import { useRouter } from "next/navigation";
 import { useState, useEffect, useRef } from "react";
 import ReactMarkdown from "react-markdown";
-import { ArrowRight, ArrowUp } from "lucide-react";
+import { ArrowRight, ArrowUp, Edit3 } from "lucide-react";
 
 interface Message {
   role: "user" | "assistant";
@@ -554,10 +554,16 @@ export default function Conversation() {
       {showModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50">
           <div className="mx-4 max-w-2xl rounded-lg border border-(--color-border) bg-(--color-background) p-8 shadow-xl">
-            <h2 className="mb-4 text-xl font-semibold text-(--color-text) w-full md:min-w-md">
+            <h2 className="mb-2 text-xl font-semibold text-(--color-text) w-full md:min-w-md">
               Síntesis de la Conversación
             </h2>
-            <div className="mb-6 max-h-96 overflow-y-auto rounded-lg border border-(--color-border) bg-(--color-input-bg) p-4">
+            {!isSynthesisLoading && (
+              <div className="mb-4 flex items-center gap-2 text-sm text-(--color-text-secondary)">
+                <Edit3 size={16} className="text-(--color-primary)" />
+                <p>Puedes modificar la síntesis antes de continuar</p>
+              </div>
+            )}
+            <div className="mb-6 max-h-96 overflow-y-auto rounded-lg border-2 border-(--color-input-border) bg-(--color-input-bg) p-4 focus-within:border-(--color-primary) transition-colors">
               {isSynthesisLoading ? (
                 <div className="flex flex-col items-center justify-center min-h-[200px] space-y-4">
                   <div className="flex items-center space-x-2">
@@ -583,6 +589,8 @@ export default function Conversation() {
                   className="w-full min-h-[200px] bg-transparent text-sm leading-relaxed text-(--color-text) outline-none resize-none"
                   value={editableSynthesis}
                   onChange={(e) => setEditableSynthesis(e.target.value)}
+                  placeholder="Edita la síntesis del problema aquí..."
+                  autoFocus
                 />
               )}
             </div>
@@ -595,7 +603,7 @@ export default function Conversation() {
                 disabled={isSynthesisLoading}
                 className="cursor-pointer rounded-md border border-(--color-border) px-6 py-2 text-sm font-medium text-(--color-text) transition-colors hover:bg-(--color-input-bg) disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                Cancelar
+                ← Volver al chat
               </button>
               <button
                 onClick={handleCreateJobs}
