@@ -185,12 +185,11 @@ def handler(event, context):
 
                 raise
 
-            return {"statusCode": 200, "body": json.dumps("Successfully processed messages")}
-
         except Exception as e:
             logger.error(f"Error in orchestrator: {str(e)}", exc_info=True)
             raise
 
+    return {"statusCode": 200, "body": json.dumps("Successfully processed messages")}
 
 def invoke_agent(function_name, payload):
     """
