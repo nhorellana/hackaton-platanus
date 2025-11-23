@@ -3,6 +3,7 @@
 import { useRouter } from "next/navigation";
 import { useState, useEffect } from "react";
 import type { ReactElement } from "react";
+import ReactMarkdown from 'react-markdown';
 
 type JobType = 'slack' | 'data' | 'research' | 'mail' | 'market_research' | 'external_research';
 type JobStatus = 'CREATED' | 'IN_PROGRESS' | 'COMPLETED' | 'FAILED' | 'pending' | 'in_progress' | 'completed' | 'failed';
@@ -182,7 +183,30 @@ export default function Jobs() {
         if (!instructionsStr) return null;
         try {
             const parsed = JSON.parse(instructionsStr);
+            // If instructions is a string, parse it again
+            if (parsed.instructions && typeof parsed.instructions === 'string') {
+                try {
+                    parsed.instructions = JSON.parse(parsed.instructions);
+                } catch {
+                    // Keep as string if parsing fails
+                }
+            }
             return parsed;
+        } catch {
+            return null;
+        }
+    };
+
+    const extractJsonFromString = (str: string) => {
+        if (!str) return null;
+        try {
+            // Try to find JSON code block (```json ... ```)
+            const jsonBlockMatch = str.match(/```json\s*\n([\s\S]*?)\n```/);
+            if (jsonBlockMatch && jsonBlockMatch[1]) {
+                return JSON.parse(jsonBlockMatch[1]);
+            }
+            // Try to parse the string directly as JSON
+            return JSON.parse(str);
         } catch {
             return null;
         }
@@ -380,43 +404,67 @@ export default function Jobs() {
                                                 {(jobType === 'research' || jobType === 'data' || jobType === 'market_research' || jobType === 'external_research') && instructions && (
                                                     <div className="space-y-3">
                                                         {/* Objective Section */}
-                                                        {instructions.justification && (
+                                                        {(instructions.instructions?.reason || instructions.justification) && (
                                                             <div className="bg-(--color-background) rounded-lg p-3 border border-(--color-border)">
                                                                 <p className="text-[10px] font-medium text-(--color-text-secondary) uppercase tracking-wider mb-2">
                                                                     Objetivo de la Investigación
                                                                 </p>
                                                                 <p className="text-xs text-(--color-text) leading-relaxed">
-                                                                    {instructions.justification}
+                                                                    {instructions.instructions?.reason || instructions.justification}
                                                                 </p>
                                                             </div>
                                                         )}
 
                                                         {/* Research Findings - Tabs */}
-                                                        {instructions.findings && (
+                                                        {instructions.findings && (() => {
+                                                            // Parse findings if they're strings with embedded JSON
+                                                            const parsedFindings = {
+                                                                obstacles: typeof instructions.findings.obstacles === 'string'
+                                                                    ? extractJsonFromString(instructions.findings.obstacles)
+                                                                    : instructions.findings.obstacles,
+                                                                solutions: typeof instructions.findings.solutions === 'string'
+                                                                    ? extractJsonFromString(instructions.findings.solutions)
+                                                                    : instructions.findings.solutions,
+                                                                legal: typeof instructions.findings.legal === 'string'
+                                                                    ? extractJsonFromString(instructions.findings.legal)
+                                                                    : instructions.findings.legal,
+                                                                competitors: typeof instructions.findings.competitors === 'string'
+                                                                    ? extractJsonFromString(instructions.findings.competitors)
+                                                                    : instructions.findings.competitors,
+                                                                market: typeof instructions.findings.market === 'string'
+                                                                    ? extractJsonFromString(instructions.findings.market)
+                                                                    : instructions.findings.market
+                                                            };
+
+                                                            if (!parsedFindings.obstacles && !parsedFindings.solutions && !parsedFindings.legal && !parsedFindings.competitors && !parsedFindings.market) {
+                                                                return null;
+                                                            }
+
+                                                            return (
                                                             <div className="border border-(--color-border) rounded-lg overflow-hidden">
                                                                 {/* Tabs Navigation */}
                                                                 <div className="flex border-b border-(--color-border) bg-(--color-background) overflow-x-auto">
-                                                                    {instructions.findings.obstacles && (
+                                                                    {parsedFindings.obstacles && (
                                                                         <button className="px-3 py-2 text-xs font-medium text-(--color-text-secondary) hover:text-(--color-text) hover:bg-(--color-input-bg) border-b-2 border-transparent hover:border-(--color-primary) transition-colors whitespace-nowrap">
                                                                             Obstáculos
                                                                         </button>
                                                                     )}
-                                                                    {instructions.findings.solutions && (
+                                                                    {parsedFindings.solutions && (
                                                                         <button className="px-3 py-2 text-xs font-medium text-(--color-text-secondary) hover:text-(--color-text) hover:bg-(--color-input-bg) border-b-2 border-transparent hover:border-(--color-primary) transition-colors whitespace-nowrap">
                                                                             Soluciones
                                                                         </button>
                                                                     )}
-                                                                    {instructions.findings.legal && (
+                                                                    {parsedFindings.legal && (
                                                                         <button className="px-3 py-2 text-xs font-medium text-(--color-text-secondary) hover:text-(--color-text) hover:bg-(--color-input-bg) border-b-2 border-transparent hover:border-(--color-primary) transition-colors whitespace-nowrap">
                                                                             Legal
                                                                         </button>
                                                                     )}
-                                                                    {instructions.findings.competitors && (
+                                                                    {parsedFindings.competitors && (
                                                                         <button className="px-3 py-2 text-xs font-medium text-(--color-text-secondary) hover:text-(--color-text) hover:bg-(--color-input-bg) border-b-2 border-transparent hover:border-(--color-primary) transition-colors whitespace-nowrap">
                                                                             Competidores
                                                                         </button>
                                                                     )}
-                                                                    {instructions.findings.market && (
+                                                                    {parsedFindings.market && (
                                                                         <button className="px-3 py-2 text-xs font-medium text-(--color-text-secondary) hover:text-(--color-text) hover:bg-(--color-input-bg) border-b-2 border-transparent hover:border-(--color-primary) transition-colors whitespace-nowrap">
                                                                             Mercado
                                                                         </button>
@@ -424,155 +472,311 @@ export default function Jobs() {
                                                                 </div>
 
                                                                 {/* Tab Content - Show first available */}
-                                                                <div className="p-3 bg-(--color-input-bg) max-h-64 overflow-y-auto">
+                                                                <div className="p-3 bg-(--color-input-bg) max-h-64 overflow-y-auto space-y-4">
                                                                     {/* Obstacles Tab */}
-                                                                    {instructions.findings.obstacles?.critical_insights && (
-                                                                        <div className="space-y-2">
-                                                                            <p className="text-[10px] font-medium text-(--color-text-secondary) uppercase tracking-wider">
-                                                                                Insights Críticos
-                                                                            </p>
-                                                                            <ul className="space-y-1">
-                                                                                {instructions.findings.obstacles.critical_insights.slice(0, 5).map((insight: string, idx: number) => (
-                                                                                    <li key={idx} className="text-xs text-(--color-text) leading-relaxed flex gap-2">
-                                                                                        <span className="text-(--color-primary) shrink-0">•</span>
-                                                                                        <span>{insight}</span>
-                                                                                    </li>
-                                                                                ))}
-                                                                            </ul>
-                                                                        </div>
-                                                                    )}
+                                                                    {parsedFindings.obstacles && (() => {
+                                                                        // Handle different structures: direct array or nested object
+                                                                        const technicalObstacles = parsedFindings.obstacles.technical || [];
+                                                                        const marketObstacles = parsedFindings.obstacles.market || [];
+                                                                        const regulatoryObstacles = parsedFindings.obstacles.regulatory || [];
+                                                                        const criticalInsights = parsedFindings.obstacles.critical_insights || [];
+
+                                                                        return (
+                                                                            <div className="space-y-3">
+                                                                                {technicalObstacles.length > 0 && (
+                                                                                    <div>
+                                                                                        <p className="text-[10px] font-medium text-(--color-text-secondary) uppercase tracking-wider mb-2">
+                                                                                            Desafíos Técnicos
+                                                                                        </p>
+                                                                                        <ul className="space-y-1">
+                                                                                            {technicalObstacles.slice(0, 5).map((obstacle: string, idx: number) => (
+                                                                                                <li key={idx} className="text-xs text-(--color-text) leading-relaxed flex gap-2">
+                                                                                                    <span className="text-(--color-primary) shrink-0">•</span>
+                                                                                                    <span>{obstacle}</span>
+                                                                                                </li>
+                                                                                            ))}
+                                                                                        </ul>
+                                                                                    </div>
+                                                                                )}
+                                                                                {marketObstacles.length > 0 && (
+                                                                                    <div>
+                                                                                        <p className="text-[10px] font-medium text-(--color-text-secondary) uppercase tracking-wider mb-2">
+                                                                                            Barreras de Mercado
+                                                                                        </p>
+                                                                                        <ul className="space-y-1">
+                                                                                            {marketObstacles.slice(0, 5).map((obstacle: string, idx: number) => (
+                                                                                                <li key={idx} className="text-xs text-(--color-text) leading-relaxed flex gap-2">
+                                                                                                    <span className="text-(--color-primary) shrink-0">•</span>
+                                                                                                    <span>{obstacle}</span>
+                                                                                                </li>
+                                                                                            ))}
+                                                                                        </ul>
+                                                                                    </div>
+                                                                                )}
+                                                                                {regulatoryObstacles.length > 0 && (
+                                                                                    <div>
+                                                                                        <p className="text-[10px] font-medium text-(--color-text-secondary) uppercase tracking-wider mb-2">
+                                                                                            Complejidad Regulatoria
+                                                                                        </p>
+                                                                                        <ul className="space-y-1">
+                                                                                            {regulatoryObstacles.slice(0, 5).map((obstacle: string, idx: number) => (
+                                                                                                <li key={idx} className="text-xs text-(--color-text) leading-relaxed flex gap-2">
+                                                                                                    <span className="text-(--color-primary) shrink-0">•</span>
+                                                                                                    <span>{obstacle}</span>
+                                                                                                </li>
+                                                                                            ))}
+                                                                                        </ul>
+                                                                                    </div>
+                                                                                )}
+                                                                                {criticalInsights.length > 0 && (
+                                                                                    <div>
+                                                                                        <p className="text-[10px] font-medium text-(--color-text-secondary) uppercase tracking-wider mb-2">
+                                                                                            Insights Críticos
+                                                                                        </p>
+                                                                                        <ul className="space-y-1">
+                                                                                            {criticalInsights.slice(0, 5).map((insight: string, idx: number) => (
+                                                                                                <li key={idx} className="text-xs text-(--color-text) leading-relaxed flex gap-2">
+                                                                                                    <span className="text-(--color-primary) shrink-0">•</span>
+                                                                                                    <span>{insight}</span>
+                                                                                                </li>
+                                                                                            ))}
+                                                                                        </ul>
+                                                                                    </div>
+                                                                                )}
+                                                                            </div>
+                                                                        );
+                                                                    })()}
 
                                                                     {/* Solutions Tab */}
-                                                                    {instructions.findings.solutions?.digital_solutions && (
-                                                                        <div className="space-y-2">
-                                                                            <p className="text-[10px] font-medium text-(--color-text-secondary) uppercase tracking-wider">
-                                                                                Soluciones Digitales ({instructions.findings.solutions.digital_solutions.length})
-                                                                            </p>
-                                                                            <div className="space-y-2">
-                                                                                {instructions.findings.solutions.digital_solutions.slice(0, 3).map((solution: Record<string, string>, idx: number) => (
-                                                                                    <div key={idx} className="bg-(--color-background) rounded p-2 border border-(--color-border)">
-                                                                                        <p className="text-xs font-medium text-(--color-text)">{solution.name}</p>
-                                                                                        <p className="text-xs text-(--color-text-secondary) mt-1">{solution.description}</p>
+                                                                    {parsedFindings.solutions && (() => {
+                                                                        const manualSolutions = parsedFindings.solutions.manual_solutions || [];
+                                                                        const digitalSolutions = parsedFindings.solutions.digital_solutions || [];
+
+                                                                        return (
+                                                                            <div className="space-y-3">
+                                                                                {manualSolutions.length > 0 && (
+                                                                                    <div>
+                                                                                        <p className="text-[10px] font-medium text-(--color-text-secondary) uppercase tracking-wider mb-2">
+                                                                                            Soluciones Manuales ({manualSolutions.length})
+                                                                                        </p>
+                                                                                        <div className="space-y-2">
+                                                                                            {manualSolutions.slice(0, 3).map((solution: { name: string; description: string; effectiveness?: string }, idx: number) => (
+                                                                                                <div key={idx} className="bg-(--color-background) rounded p-2 border border-(--color-border)">
+                                                                                                    <p className="text-xs font-medium text-(--color-text)">{solution.name}</p>
+                                                                                                    <p className="text-xs text-(--color-text-secondary) mt-1">{solution.description}</p>
+                                                                                                    {solution.effectiveness && (
+                                                                                                        <p className="text-[10px] text-(--color-primary) mt-1">Efectividad: {solution.effectiveness}</p>
+                                                                                                    )}
+                                                                                                </div>
+                                                                                            ))}
+                                                                                        </div>
                                                                                     </div>
-                                                                                ))}
+                                                                                )}
+                                                                                {digitalSolutions.length > 0 && (
+                                                                                    <div>
+                                                                                        <p className="text-[10px] font-medium text-(--color-text-secondary) uppercase tracking-wider mb-2">
+                                                                                            Soluciones Digitales ({digitalSolutions.length})
+                                                                                        </p>
+                                                                                        <div className="space-y-2">
+                                                                                            {digitalSolutions.slice(0, 3).map((solution: { name: string; description: string; effectiveness?: string }, idx: number) => (
+                                                                                                <div key={idx} className="bg-(--color-background) rounded p-2 border border-(--color-border)">
+                                                                                                    <p className="text-xs font-medium text-(--color-text)">{solution.name}</p>
+                                                                                                    <p className="text-xs text-(--color-text-secondary) mt-1">{solution.description}</p>
+                                                                                                    {solution.effectiveness && (
+                                                                                                        <p className="text-[10px] text-(--color-primary) mt-1">Efectividad: {solution.effectiveness}</p>
+                                                                                                    )}
+                                                                                                </div>
+                                                                                            ))}
+                                                                                        </div>
+                                                                                    </div>
+                                                                                )}
                                                                             </div>
-                                                                        </div>
-                                                                    )}
+                                                                        );
+                                                                    })()}
 
                                                                     {/* Legal Tab */}
-                                                                    {instructions.findings.legal?.critical_compliance_insights && (
-                                                                        <div className="space-y-2">
-                                                                            <p className="text-[10px] font-medium text-(--color-text-secondary) uppercase tracking-wider">
-                                                                                Cumplimiento Crítico
-                                                                            </p>
-                                                                            <ul className="space-y-1">
-                                                                                {instructions.findings.legal.critical_compliance_insights.slice(0, 5).map((insight: string, idx: number) => (
-                                                                                    <li key={idx} className="text-xs text-(--color-text) leading-relaxed flex gap-2">
-                                                                                        <span className="text-(--color-primary) shrink-0">•</span>
-                                                                                        <span>{insight}</span>
-                                                                                    </li>
-                                                                                ))}
-                                                                            </ul>
-                                                                        </div>
-                                                                    )}
+                                                                    {parsedFindings.legal && (() => {
+                                                                        const industryRegulations = parsedFindings.legal.industry_regulations || [];
+                                                                        const criticalInsights = parsedFindings.legal.critical_compliance_insights || [];
+
+                                                                        return (
+                                                                            <div className="space-y-3">
+                                                                                {industryRegulations.length > 0 && (
+                                                                                    <div>
+                                                                                        <p className="text-[10px] font-medium text-(--color-text-secondary) uppercase tracking-wider mb-2">
+                                                                                            Regulaciones de Industria ({industryRegulations.length})
+                                                                                        </p>
+                                                                                        <div className="space-y-2">
+                                                                                            {industryRegulations.slice(0, 3).map((reg: { regulation: string; requirements: string; complexity?: string; timeline?: string }, idx: number) => (
+                                                                                                <div key={idx} className="bg-(--color-background) rounded p-2 border border-(--color-border)">
+                                                                                                    <div className="flex items-start justify-between mb-1">
+                                                                                                        <p className="text-xs font-medium text-(--color-text) flex-1">{reg.regulation}</p>
+                                                                                                        {reg.complexity && (
+                                                                                                            <span className="text-[10px] text-(--color-text-secondary) bg-(--color-border) px-1.5 py-0.5 rounded ml-2">
+                                                                                                                {reg.complexity}
+                                                                                                            </span>
+                                                                                                        )}
+                                                                                                    </div>
+                                                                                                    <p className="text-xs text-(--color-text-secondary)">{reg.requirements}</p>
+                                                                                                    {reg.timeline && (
+                                                                                                        <p className="text-[10px] text-(--color-primary) mt-1">Timeline: {reg.timeline}</p>
+                                                                                                    )}
+                                                                                                </div>
+                                                                                            ))}
+                                                                                        </div>
+                                                                                    </div>
+                                                                                )}
+                                                                                {criticalInsights.length > 0 && (
+                                                                                    <div>
+                                                                                        <p className="text-[10px] font-medium text-(--color-text-secondary) uppercase tracking-wider mb-2">
+                                                                                            Cumplimiento Crítico
+                                                                                        </p>
+                                                                                        <ul className="space-y-1">
+                                                                                            {criticalInsights.slice(0, 5).map((insight: string, idx: number) => (
+                                                                                                <li key={idx} className="text-xs text-(--color-text) leading-relaxed flex gap-2">
+                                                                                                    <span className="text-(--color-primary) shrink-0">•</span>
+                                                                                                    <span>{insight}</span>
+                                                                                                </li>
+                                                                                            ))}
+                                                                                        </ul>
+                                                                                    </div>
+                                                                                )}
+                                                                            </div>
+                                                                        );
+                                                                    })()}
 
                                                                     {/* Competitors Tab */}
-                                                                    {instructions.findings.competitors?.direct_competitors && (
-                                                                        <div className="space-y-2">
-                                                                            <p className="text-[10px] font-medium text-(--color-text-secondary) uppercase tracking-wider">
-                                                                                Competidores Directos ({instructions.findings.competitors.direct_competitors.length})
-                                                                            </p>
+                                                                    {parsedFindings.competitors && (() => {
+                                                                        const directCompetitors = parsedFindings.competitors.direct_competitors || [];
+
+                                                                        return (
                                                                             <div className="space-y-2">
-                                                                                {instructions.findings.competitors.direct_competitors.slice(0, 3).map((comp: Record<string, string>, idx: number) => (
-                                                                                    <div key={idx} className="bg-(--color-background) rounded p-2 border border-(--color-border)">
-                                                                                        <div className="flex items-center justify-between mb-1">
-                                                                                            <p className="text-xs font-medium text-(--color-text)">{comp.name}</p>
-                                                                                            <span className="text-[10px] text-(--color-text-secondary) bg-(--color-border) px-1.5 py-0.5 rounded">
-                                                                                                {comp.market_position}
-                                                                                            </span>
+                                                                                <p className="text-[10px] font-medium text-(--color-text-secondary) uppercase tracking-wider mb-2">
+                                                                                    Competidores Directos ({directCompetitors.length})
+                                                                                </p>
+                                                                                <div className="space-y-2">
+                                                                                    {directCompetitors.slice(0, 3).map((comp: { name: string; description: string; market_position?: string; strengths?: string[] }, idx: number) => (
+                                                                                        <div key={idx} className="bg-(--color-background) rounded p-2 border border-(--color-border)">
+                                                                                            <div className="flex items-center justify-between mb-1">
+                                                                                                <p className="text-xs font-medium text-(--color-text)">{comp.name}</p>
+                                                                                                {comp.market_position && (
+                                                                                                    <span className="text-[10px] text-(--color-text-secondary) bg-(--color-border) px-1.5 py-0.5 rounded">
+                                                                                                        {comp.market_position}
+                                                                                                    </span>
+                                                                                                )}
+                                                                                            </div>
+                                                                                            <p className="text-xs text-(--color-text-secondary) mb-1">{comp.description}</p>
+                                                                                            {comp.strengths && comp.strengths.length > 0 && (
+                                                                                                <div className="mt-2">
+                                                                                                    <p className="text-[10px] font-medium text-(--color-text-secondary) mb-1">Fortalezas:</p>
+                                                                                                    <ul className="space-y-0.5">
+                                                                                                        {comp.strengths.slice(0, 2).map((strength: string, sIdx: number) => (
+                                                                                                            <li key={sIdx} className="text-[10px] text-(--color-text) flex gap-1">
+                                                                                                                <span className="text-(--color-primary) shrink-0">+</span>
+                                                                                                                <span>{strength}</span>
+                                                                                                            </li>
+                                                                                                        ))}
+                                                                                                    </ul>
+                                                                                                </div>
+                                                                                            )}
                                                                                         </div>
-                                                                                        <p className="text-xs text-(--color-text-secondary)">{comp.description}</p>
-                                                                                    </div>
-                                                                                ))}
+                                                                                    ))}
+                                                                                </div>
                                                                             </div>
-                                                                        </div>
-                                                                    )}
+                                                                        );
+                                                                    })()}
 
                                                                     {/* Market Tab */}
-                                                                    {instructions.findings.market?.market_size && (
-                                                                        <div className="space-y-3">
-                                                                            <div>
-                                                                                <p className="text-[10px] font-medium text-(--color-text-secondary) uppercase tracking-wider mb-2">
-                                                                                    Tamaño de Mercado
-                                                                                </p>
-                                                                                <div className="grid grid-cols-3 gap-2">
-                                                                                    {instructions.findings.market.market_size.tam && (
-                                                                                        <div className="bg-(--color-background) rounded p-2 border border-(--color-border)">
-                                                                                            <p className="text-[10px] text-(--color-text-secondary) mb-1">TAM</p>
-                                                                                            <p className="text-sm font-medium text-(--color-text)">
-                                                                                                ${instructions.findings.market.market_size.tam.value}B
-                                                                                            </p>
+                                                                    {parsedFindings.market && (() => {
+                                                                        const marketSize = parsedFindings.market.market_size;
+                                                                        const criticalInsights = parsedFindings.market.critical_insights || [];
+
+                                                                        return (
+                                                                            <div className="space-y-3">
+                                                                                {marketSize && (
+                                                                                    <div>
+                                                                                        <p className="text-[10px] font-medium text-(--color-text-secondary) uppercase tracking-wider mb-2">
+                                                                                            Tamaño de Mercado
+                                                                                        </p>
+                                                                                        <div className="grid grid-cols-3 gap-2">
+                                                                                            {marketSize.tam && (
+                                                                                                <div className="bg-(--color-background) rounded p-2 border border-(--color-border)">
+                                                                                                    <p className="text-[10px] text-(--color-text-secondary) mb-1">TAM</p>
+                                                                                                    <p className="text-sm font-medium text-(--color-text)">
+                                                                                                        ${(parseFloat(marketSize.tam.value) / 1000000000).toFixed(1)}B
+                                                                                                    </p>
+                                                                                                    <p className="text-[10px] text-(--color-text-secondary) mt-1">{marketSize.tam.year}</p>
+                                                                                                </div>
+                                                                                            )}
+                                                                                            {marketSize.sam && (
+                                                                                                <div className="bg-(--color-background) rounded p-2 border border-(--color-border)">
+                                                                                                    <p className="text-[10px] text-(--color-text-secondary) mb-1">SAM</p>
+                                                                                                    <p className="text-sm font-medium text-(--color-text)">
+                                                                                                        ${(parseFloat(marketSize.sam.value) / 1000000000).toFixed(1)}B
+                                                                                                    </p>
+                                                                                                    <p className="text-[10px] text-(--color-text-secondary) mt-1">{marketSize.sam.year}</p>
+                                                                                                </div>
+                                                                                            )}
+                                                                                            {marketSize.som && (
+                                                                                                <div className="bg-(--color-background) rounded p-2 border border-(--color-border)">
+                                                                                                    <p className="text-[10px] text-(--color-text-secondary) mb-1">SOM</p>
+                                                                                                    <p className="text-sm font-medium text-(--color-text)">
+                                                                                                        ${(parseFloat(marketSize.som.value) / 1000000).toFixed(0)}M
+                                                                                                    </p>
+                                                                                                    <p className="text-[10px] text-(--color-text-secondary) mt-1">{marketSize.som.year}</p>
+                                                                                                </div>
+                                                                                            )}
                                                                                         </div>
-                                                                                    )}
-                                                                                    {instructions.findings.market.market_size.sam && (
-                                                                                        <div className="bg-(--color-background) rounded p-2 border border-(--color-border)">
-                                                                                            <p className="text-[10px] text-(--color-text-secondary) mb-1">SAM</p>
-                                                                                            <p className="text-sm font-medium text-(--color-text)">
-                                                                                                ${instructions.findings.market.market_size.sam.value}B
-                                                                                            </p>
-                                                                                        </div>
-                                                                                    )}
-                                                                                    {instructions.findings.market.market_size.som && (
-                                                                                        <div className="bg-(--color-background) rounded p-2 border border-(--color-border)">
-                                                                                            <p className="text-[10px] text-(--color-text-secondary) mb-1">SOM</p>
-                                                                                            <p className="text-sm font-medium text-(--color-text)">
-                                                                                                ${instructions.findings.market.market_size.som.value}M
-                                                                                            </p>
-                                                                                        </div>
-                                                                                    )}
-                                                                                </div>
+                                                                                    </div>
+                                                                                )}
+                                                                                {criticalInsights.length > 0 && (
+                                                                                    <div>
+                                                                                        <p className="text-[10px] font-medium text-(--color-text-secondary) uppercase tracking-wider mb-2">
+                                                                                            Insights Clave
+                                                                                        </p>
+                                                                                        <ul className="space-y-1">
+                                                                                            {criticalInsights.slice(0, 3).map((insight: string, idx: number) => (
+                                                                                                <li key={idx} className="text-xs text-(--color-text) leading-relaxed flex gap-2">
+                                                                                                    <span className="text-(--color-primary) shrink-0">•</span>
+                                                                                                    <span>{insight}</span>
+                                                                                                </li>
+                                                                                            ))}
+                                                                                        </ul>
+                                                                                    </div>
+                                                                                )}
                                                                             </div>
-                                                                            {instructions.findings.market.critical_insights && (
-                                                                                <div>
-                                                                                    <p className="text-[10px] font-medium text-(--color-text-secondary) uppercase tracking-wider mb-2">
-                                                                                        Insights Clave
-                                                                                    </p>
-                                                                                    <ul className="space-y-1">
-                                                                                        {instructions.findings.market.critical_insights.slice(0, 3).map((insight: string, idx: number) => (
-                                                                                            <li key={idx} className="text-xs text-(--color-text) leading-relaxed flex gap-2">
-                                                                                                <span className="text-(--color-primary) shrink-0">•</span>
-                                                                                                <span>{insight}</span>
-                                                                                            </li>
-                                                                                        ))}
-                                                                                    </ul>
-                                                                                </div>
-                                                                            )}
-                                                                        </div>
-                                                                    )}
+                                                                        );
+                                                                    })()}
                                                                 </div>
                                                             </div>
-                                                        )}
+                                                            );
+                                                        })()}
 
                                                         {/* Queries Section */}
-                                                        {instructions.queries && instructions.queries.length > 0 && (
-                                                            <div>
-                                                                <p className="text-[10px] font-medium text-(--color-text-secondary) uppercase tracking-wider mb-2">
-                                                                    Consultas Realizadas ({instructions.queries.length})
-                                                                </p>
-                                                                <div className="space-y-1">
-                                                                    {instructions.queries.slice(0, 3).map((query: string, idx: number) => (
-                                                                        <div key={idx} className="text-xs text-(--color-text-secondary) bg-(--color-background) rounded p-2 border border-(--color-border) leading-relaxed">
-                                                                            • {query}
-                                                                        </div>
-                                                                    ))}
-                                                                    {instructions.queries.length > 3 && (
-                                                                        <p className="text-xs text-(--color-text-secondary) italic mt-1">
-                                                                            +{instructions.queries.length - 3} consultas más
-                                                                        </p>
-                                                                    )}
+                                                        {(() => {
+                                                            const queries = instructions.instructions?.search_queries || instructions.queries;
+                                                            if (!queries || queries.length === 0) return null;
+
+                                                            return (
+                                                                <div>
+                                                                    <p className="text-[10px] font-medium text-(--color-text-secondary) uppercase tracking-wider mb-2">
+                                                                        Consultas Realizadas ({queries.length})
+                                                                    </p>
+                                                                    <div className="space-y-1">
+                                                                        {queries.slice(0, 3).map((query: string, idx: number) => (
+                                                                            <div key={idx} className="text-xs text-(--color-text-secondary) bg-(--color-background) rounded p-2 border border-(--color-border) leading-relaxed">
+                                                                                • {query}
+                                                                            </div>
+                                                                        ))}
+                                                                        {queries.length > 3 && (
+                                                                            <p className="text-xs text-(--color-text-secondary) italic mt-1">
+                                                                                +{queries.length - 3} consultas más
+                                                                            </p>
+                                                                        )}
+                                                                    </div>
                                                                 </div>
-                                                            </div>
-                                                        )}
+                                                            );
+                                                        })()}
                                                     </div>
                                                 )}
 
@@ -606,50 +810,89 @@ export default function Jobs() {
                                                 )}
 
                                                 {/* Results Section - Show if job is completed */}
-                                                {job.status.toLowerCase() === 'completed' && job.result && (
-                                                    <div className="mt-3 pt-3 border-t border-(--color-border)">
-                                                        <p className="text-[10px] font-medium text-(--color-text-secondary) uppercase tracking-wider mb-2">
-                                                            Resultado
-                                                        </p>
-                                                        <div className="bg-(--color-background) rounded-lg p-3 border border-(--color-border)">
-                                                            <p className="text-xs text-(--color-text) leading-relaxed">
-                                                                {typeof job.result === 'string' ? job.result : job.result?.content}
-                                                            </p>
+                                                {job.status.toLowerCase() === 'completed' && job.result && (() => {
+                                                    // Parse result if it's a string
+                                                    let parsedResult = job.result;
+                                                    if (typeof job.result === 'string') {
+                                                        try {
+                                                            parsedResult = JSON.parse(job.result);
+                                                        } catch {
+                                                            // If parsing fails, treat as plain string
+                                                            parsedResult = { content: job.result };
+                                                        }
+                                                    }
 
-                                                            {/* Sources if available */}
-                                                            {typeof job.result === 'object' && job.result?.sources && job.result.sources.length > 0 && (
-                                                                <div className="mt-3 space-y-2">
-                                                                    <p className="text-[10px] font-medium text-(--color-text-secondary) uppercase tracking-wider">
-                                                                        Fuentes ({job.result.sources.length})
-                                                                    </p>
-                                                                    {job.result.sources.slice(0, 3).map((source, idx) => (
-                                                                        <div key={idx} className="bg-(--color-input-bg) rounded p-2 border border-(--color-border)">
-                                                                            <p className="text-xs font-medium text-(--color-text) mb-1">
-                                                                                {idx + 1}. {source.title}
-                                                                            </p>
-                                                                            <p className="text-xs text-(--color-text-secondary) mb-1">
-                                                                                {source.description}
-                                                                            </p>
-                                                                            <a
-                                                                                href={source.url}
-                                                                                target="_blank"
-                                                                                rel="noopener noreferrer"
-                                                                                className="text-xs text-(--color-primary) hover:underline break-all"
-                                                                            >
-                                                                                {source.url}
-                                                                            </a>
-                                                                        </div>
-                                                                    ))}
-                                                                    {job.result.sources.length > 3 && (
-                                                                        <p className="text-xs text-(--color-text-secondary) italic">
-                                                                            +{job.result.sources.length - 3} fuentes más
-                                                                        </p>
-                                                                    )}
+                                                    // Extract synthesis as the main content for deep research results
+                                                    const resultContent = typeof parsedResult === 'string'
+                                                        ? parsedResult
+                                                        : ((parsedResult as Record<string, unknown>)?.synthesis as string) || ((parsedResult as Record<string, unknown>)?.content as string) || '';
+
+                                                    // Extract findings for sources display
+                                                    const resultFindings = typeof parsedResult === 'object' ? (parsedResult as Record<string, unknown>)?.findings as Record<string, string> | undefined : null;
+
+                                                    return (
+                                                        <div className="mt-3 pt-3 border-t border-(--color-border)">
+                                                            <p className="text-[10px] font-medium text-(--color-text-secondary) uppercase tracking-wider mb-2">
+                                                                Resultado
+                                                            </p>
+                                                            <div className="bg-(--color-background) rounded-lg p-3 border border-(--color-border)">
+                                                                <div className="text-xs text-(--color-text) leading-relaxed prose prose-sm prose-invert max-w-none prose-headings:text-(--color-text) prose-p:text-(--color-text) prose-strong:text-(--color-text) prose-ul:text-(--color-text) prose-ol:text-(--color-text)">
+                                                                    <ReactMarkdown>{resultContent}</ReactMarkdown>
                                                                 </div>
-                                                            )}
+
+                                                                {/* Findings Sections */}
+                                                                {resultFindings && (() => {
+                                                                    const findingTypes = ['obstacles', 'solutions', 'legal', 'competitors', 'market'];
+                                                                    const availableFindings = findingTypes.filter(type => resultFindings[type]);
+
+                                                                    if (availableFindings.length === 0) return null;
+
+                                                                    return (
+                                                                        <div className="mt-4 space-y-3">
+                                                                            <p className="text-[10px] font-medium text-(--color-text-secondary) uppercase tracking-wider">
+                                                                                Hallazgos Detallados
+                                                                            </p>
+                                                                            {availableFindings.map((findingType) => {
+                                                                                console.log('Finding Data:', findingType, resultFindings[findingType]);
+                                                                                const findingData =  <ReactMarkdown>{resultFindings[findingType]}</ReactMarkdown>
+                                                                                const labels: Record<string, string> = {
+                                                                                    obstacles: 'Obstáculos',
+                                                                                    solutions: 'Soluciones',
+                                                                                    legal: 'Legal',
+                                                                                    competitors: 'Competidores',
+                                                                                    market: 'Mercado'
+                                                                                };
+
+                                                                                return (
+                                                                                    <div key={findingType} className="bg-(--color-input-bg) rounded p-3 border border-(--color-border)">
+                                                                                        <p className="text-xs font-medium text-(--color-text) mb-2">
+                                                                                            {labels[findingType]}
+                                                                                        </p>
+
+                                                                                        {/* Render first item based on type */}
+                                                                                        {findingType === 'obstacles' && (
+                                                                                            <p className="text-xs text-(--color-text-secondary) leading-relaxed">
+                                                                                                {findingData}
+                                                                                            </p>
+                                                                                        )}
+
+                                                                                        {findingType === 'solutions' && (
+                                                                                            <div>
+                                                                                                <p className="text-xs font-medium text-(--color-text)">
+                                                                                                    {findingData}
+                                                                                                </p>
+                                                                                            </div>
+                                                                                        )}
+                                                                                    </div>
+                                                                                );
+                                                                            })}
+                                                                        </div>
+                                                                    );
+                                                                })()}
+                                                            </div>
                                                         </div>
-                                                    </div>
-                                                )}
+                                                    );
+                                                })()}
                                             </div>
                                         )}
                                     </div>
