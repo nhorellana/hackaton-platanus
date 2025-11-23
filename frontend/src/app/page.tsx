@@ -78,7 +78,7 @@ export default function Home() {
       <div className="absolute inset-0 bg-[linear-gradient(to_right,#80808008_1px,transparent_1px),linear-gradient(to_bottom,#80808008_1px,transparent_1px)] bg-size-[64px_64px]" />
       <div className="relative mx-auto max-w-7xl px-6 py-24 sm:py-32 lg:px-8 flex items-center justify-center min-h-screen">
         <div className="mx-auto max-w-3xl text-center">
-          <div className="mx-auto max-w-2xl mb-24 -mt-28">
+          <div className="mx-auto max-w-2xl mb-24 -mt-8 md:-mt-28">
             <ProcessStepper currentStep={0} />
           </div>
           {/* Badge */}
