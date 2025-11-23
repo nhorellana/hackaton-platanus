@@ -74,10 +74,6 @@ export default function Home() {
 
   return (
     <section className="relative min-h-screen overflow-hidden border-b border-(--color-border) bg-(--color-background)">
-      {/* Process Stepper */}
-      <div className="w-full max-w-5xl mb-16">
-        <ProcessStepper currentStep={currentStep} />
-      </div>
       {/* Grid background pattern */}
       <div className="absolute inset-0 bg-[linear-gradient(to_right,#80808008_1px,transparent_1px),linear-gradient(to_bottom,#80808008_1px,transparent_1px)] bg-size-[64px_64px]" />
       <div className="relative mx-auto max-w-7xl px-6 py-24 sm:py-32 lg:px-8 flex items-center justify-center min-h-screen">
