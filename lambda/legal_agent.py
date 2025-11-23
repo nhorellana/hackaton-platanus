@@ -1,7 +1,8 @@
 import json
 import logging
 import os
-from shared.anthropic import Anthropic
+from shared.anthropic import Anthropic, ConversationMessage
+from datetime import datetime
 
 logger = logging.getLogger()
 logger.setLevel(logging.INFO)
@@ -136,7 +137,6 @@ Proporciona información específica y accionable con fuentes."""
             timestamp=datetime.utcnow().isoformat()
         )],
         system=system_prompt,
-        messages=[{"role": "user", "content": user_prompt}],
         tools=tools
     )
 
