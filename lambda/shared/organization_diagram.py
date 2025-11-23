@@ -33,7 +33,7 @@ ORGANIZATION_PEOPLE: List[Person] = [
     # --- LEADERSHIP & STRATEGY ---
     Person(
         name="Maria Rodriguez",
-        email="jtgonzalez@copec.cl",
+        email="admin@welcomeback.io",
         role="CEO",
         role_description="Chief Executive Officer responsible for overall company strategy, vision, and major business decisions",
         projects=[
@@ -45,7 +45,7 @@ ORGANIZATION_PEOPLE: List[Person] = [
 
     Person(
         name="Carlos Mendez",
-        email="jschenke@copec.cl",
+        email="admin@welcomeback.io",
         role="CFO",
         role_description="Chief Financial Officer managing financial planning, budgeting, and investment decisions",
         projects=[
