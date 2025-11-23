@@ -12,31 +12,64 @@ logger.setLevel(logging.INFO)
 
 def extract_json_from_response(response_text: str) -> dict:
     """
-    Extract JSON object from Claude's response which may contain markdown and other text.
+    Extract JSON object from Claude's response which may contain markdown, web search tags, and other text.
     Looks for ```json ... ``` blocks or standalone JSON objects.
     """
     if not response_text:
         return {}
 
+    # Remove web search tags first
+    cleaned_text = re.sub(r'<web_search>.*?</web_search>', '', response_text, flags=re.DOTALL)
+    
     # Try to find JSON in code blocks first
-    json_match = re.search(r'```json\s*\n([\s\S]*?)\n```', response_text)
+    json_match = re.search(r'```json\s*\n([\s\S]*?)\n```', cleaned_text)
     if json_match:
         try:
-            return json.loads(json_match.group(1))
+            json_str = json_match.group(1).strip()
+            return json.loads(json_str)
         except json.JSONDecodeError as e:
             logger.warning(f"Failed to parse JSON from code block: {e}")
+            # Try to repair truncated JSON
+            try:
+                json_str = json_match.group(1).strip()
+                # Count braces and brackets
+                open_braces = json_str.count('{')
+                close_braces = json_str.count('}')
+                open_brackets = json_str.count('[')
+                close_brackets = json_str.count(']')
+                
+                # Add missing closures
+                repaired = json_str
+                for _ in range(open_brackets - close_brackets):
+                    repaired += ']'
+                for _ in range(open_braces - close_braces):
+                    repaired += '}'
+                
+                return json.loads(repaired)
+            except Exception as repair_error:
+                logger.warning(f"Failed to repair JSON: {repair_error}")
 
-    # Try to find standalone JSON object
-    json_match = re.search(r'\{[\s\S]*\}', response_text)
-    if json_match:
-        try:
-            return json.loads(json_match.group(0))
-        except json.JSONDecodeError as e:
-            logger.warning(f"Failed to parse standalone JSON: {e}")
+    # Try to find standalone JSON object (between first { and last })
+    first_brace = cleaned_text.find('{')
+    if first_brace != -1:
+        # Find the matching closing brace
+        brace_count = 0
+        for i in range(first_brace, len(cleaned_text)):
+            if cleaned_text[i] == '{':
+                brace_count += 1
+            elif cleaned_text[i] == '}':
+                brace_count -= 1
+                if brace_count == 0:
+                    json_str = cleaned_text[first_brace:i+1]
+                    try:
+                        return json.loads(json_str)
+                    except json.JSONDecodeError as e:
+                        logger.warning(f"Failed to parse standalone JSON: {e}")
+                    break
 
-    # If all else fails, return the raw text wrapped
-    logger.warning("Could not extract valid JSON from response, returning raw text")
-    return {"raw_response": response_text}
+    # If all else fails, return empty dict with error note
+    logger.error(f"Could not extract valid JSON from response. First 500 chars: {response_text[:500]}")
+    return {"error": "Could not parse agent response", "raw_preview": response_text[:500]}
 
 
 # Get environment variables
