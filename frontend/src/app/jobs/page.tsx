@@ -1,6 +1,6 @@
 "use client";
 
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { useState, useEffect } from "react";
 import type { ReactElement } from "react";
 import ProcessStepper from "@/components/ProcessStepper";
@@ -50,15 +50,13 @@ interface Job {
 
 export default function Jobs() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const currentStep = useProcessStep();
 
   const [jobs, setJobs] = useState<Job[]>([]);
   const [expandedJobs, setExpandedJobs] = useState<Set<string>>(new Set());
 
-  const [sessionId] = useState<string | null>(() => {
-    if (typeof window === "undefined") return null;
-    return localStorage.getItem("conversation-session-id");
-  });
+  const [sessionId] = useState<string | null>(() => searchParams.get('session_id'));
 
   const [isLoading, setIsLoading] = useState(true);
   const [isGeneratingSummary, setIsGeneratingSummary] = useState(false);
@@ -301,7 +299,7 @@ export default function Jobs() {
       if (response.ok) {
           const data = await response.json();
           localStorage.setItem('summary-text', data.message || data.text || '');
-          router.push('/summary');
+          router.push(`/summary${sessionId ? `?session_id=${sessionId}` : ''}`);
       } else {
           console.error('Failed to generate summary');
       }
@@ -323,7 +321,7 @@ export default function Jobs() {
       <header className="border-b border-(--color-border) bg-(--color-background) px-6 py-4 mt-6">
         <div className="mx-auto flex max-w-6xl items-center justify-between">
           <button
-            onClick={() => router.push("/conversation")}
+            onClick={() => router.push(`/conversation${sessionId ? `?session_id=${sessionId}` : ''}`)}
             className="cursor-pointer text-sm text-(--color-text-secondary) transition-colors hover:text-(--color-text)"
           >
             ← Volver a conversación

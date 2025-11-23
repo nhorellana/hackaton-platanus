@@ -1,6 +1,6 @@
 "use client";
 
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { useState, useEffect, useRef } from "react";
 import ReactMarkdown from "react-markdown";
 import { ArrowUp, Edit3 } from "lucide-react";
@@ -16,11 +16,12 @@ const API_URL = process.env.NEXT_PUBLIC_API_URL;
 
 export default function Conversation() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const currentStep = useProcessStep();
   const [messages, setMessages] = useState<Message[]>([]);
   const [inputValue, setInputValue] = useState("");
   const [isLoading, setIsLoading] = useState(false);
-  const [sessionId, setSessionId] = useState<string | null>(null);
+  const [sessionId, setSessionId] = useState<string | null>(() => searchParams.get('session_id'));
   const [showModal, setShowModal] = useState(false);
   const [synthesisMessage, setSynthesisMessage] = useState("");
   const [editableSynthesis, setEditableSynthesis] = useState("");
@@ -60,6 +61,10 @@ export default function Conversation() {
 
       if (data.session_id && !sessionId) {
         setSessionId(data.session_id);
+        // Update URL with session_id
+        const newUrl = new URL(window.location.href);
+        newUrl.searchParams.set('session_id', data.session_id);
+        window.history.replaceState({}, '', newUrl.toString());
       }
 
       // Update temperature from response
@@ -106,11 +111,6 @@ export default function Conversation() {
     hasInitialized.current = true;
 
     const savedMessages = localStorage.getItem("conversation-messages");
-    const savedSessionId = localStorage.getItem("conversation-session-id");
-
-    if (savedSessionId) {
-      setSessionId(savedSessionId);
-    }
 
     if (savedMessages) {
       try {
@@ -134,12 +134,6 @@ export default function Conversation() {
   }, [messages]);
 
   useEffect(() => {
-    if (sessionId) {
-      localStorage.setItem("conversation-session-id", sessionId);
-    }
-  }, [sessionId]);
-
-  useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
 
@@ -152,7 +146,10 @@ export default function Conversation() {
     setMessages([]);
     setSessionId(null);
     localStorage.removeItem("conversation-messages");
-    localStorage.removeItem("conversation-session-id");
+    // Clear session_id from URL
+    const newUrl = new URL(window.location.href);
+    newUrl.searchParams.delete('session_id');
+    window.history.replaceState({}, '', newUrl.toString());
   };
 
   const handleSynthesizeConversation = async () => {
@@ -245,15 +242,15 @@ export default function Conversation() {
         const data = await response.json();
         localStorage.setItem("current-jobs", JSON.stringify(data.jobs));
         setIsLoading(false);
-        router.push("/jobs");
+        router.push(`/jobs${sessionId ? `?session_id=${sessionId}` : ''}`);
       } else {
         console.error("Failed to create jobs");
         setIsLoading(false);
-        router.push("/jobs");
+        router.push(`/jobs${sessionId ? `?session_id=${sessionId}` : ''}`);
       }
     } catch (error) {
       console.error("Error creating jobs:", error);
-      router.push("/jobs");
+      router.push(`/jobs${sessionId ? `?session_id=${sessionId}` : ''}`);
       setIsLoading(false);
     }
   };
