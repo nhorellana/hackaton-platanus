@@ -8,14 +8,21 @@ from typing import Dict, Any, List
 from shared.anthropic import Anthropic, ConversationMessage
 from shared.job_model import JobHandler
 
+# TEST_MODE for local testing
+TEST_MODE = os.environ.get("TEST_MODE", "false").lower() == "true"
+
 logger = logging.getLogger()
 logger.setLevel(logging.INFO)
 
+if TEST_MODE:
+    logger.info("Running in TEST_MODE - using direct handler calls")
+
 # Initialize AWS clients
-dynamodb = boto3.resource('dynamodb')
+if not TEST_MODE:
+    dynamodb = boto3.resource('dynamodb')
 
 # Get environment variables
-JOBS_TABLE_NAME = os.environ['JOBS_TABLE_NAME']
+JOBS_TABLE_NAME = os.environ.get('JOBS_TABLE_NAME', 'test-table')
 ANTHROPIC_API_KEY = os.environ['ANTHROPIC_API_KEY']
 
 # Initialize Anthropic client
@@ -25,9 +32,52 @@ def handler(event, context):
     """
     External Research Lambda function.
     Searches for external experts using AI-powered web research.
+
+    In TEST_MODE: Pass instructions directly without DynamoDB lookup
     """
     logger.info(f'Received event: {json.dumps(event)}')
 
+    # In TEST_MODE, expect direct instructions
+    if TEST_MODE:
+        logger.info("TEST_MODE: Processing instructions directly")
+        try:
+            instructions = event.get('instructions')
+            if not instructions:
+                raise Exception("TEST_MODE requires 'instructions' in event")
+
+            if isinstance(instructions, str):
+                instructions = json.loads(instructions)
+
+            logger.info(f"TEST_MODE: Processing instructions: {str(instructions)[:100]}...")
+
+            # Extract parameters
+            expert_profile = instructions.get('expert_profile', '')
+            questions = instructions.get('questions', [])
+            context_summary = instructions.get('context_summary', '')
+
+            logger.info("TEST_MODE: Skipping DynamoDB mark_in_progress")
+
+            # Conduct external expert search
+            research_results = conduct_expert_search(expert_profile, questions, context_summary)
+
+            logger.info("TEST_MODE: Skipping DynamoDB mark_completed")
+
+            return {
+                'statusCode': 200,
+                'body': json.dumps({
+                    "message": "External research completed (TEST_MODE)",
+                    "result": research_results
+                }, ensure_ascii=False)
+            }
+
+        except Exception as e:
+            logger.error(f"TEST_MODE error: {str(e)}", exc_info=True)
+            return {
+                'statusCode': 500,
+                'body': json.dumps({"error": str(e)}, ensure_ascii=False)
+            }
+
+    # Normal SQS processing mode
     for record in event['Records']:
         try:
             # Parse the SQS message
@@ -85,6 +135,7 @@ def handler(event, context):
                 except Exception:
                     pass
 
+    print("TEST_MODE: ", TEST_MODE)
     return {'statusCode': 200, 'body': 'External research processing completed'}
 
 

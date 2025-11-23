@@ -1,0 +1,33 @@
+{
+  "expert_profile_needed": "Especialista en ciberseguridad y protección anti-spam con experiencia en telecomunicaciones",
+  "questions_for_experts": [
+    "¿Cuáles son las mejores prácticas para implementar filtros anti-spam a nivel de operador?",
+    "¿Qué tecnologías emergentes existen para detectar y bloquear comunicaciones spam?",
+    "¿Cómo implementar un sistema de reputación para números telefónicos?"
+  ],
+  "search_strategy": {
+    "professional_keywords": [
+      "Especialista"
+    ],
+    "academic_keywords": [
+      "Especialista"
+    ],
+    "industry_keywords": [
+      "Especialista"
+    ],
+    "target_roles": [
+      "consultor",
+      "director",
+      "especialista"
+    ],
+    "target_industries": [
+      "tecnología",
+      "negocios",
+      "consultoría"
+    ]
+  },
+  "found_experts": [],
+  "search_summary": "Búsqueda de Expertos Externos Completada:\n\n    • Total de expertos identificados: 0\n    • Expertos recomendados para contacto: 0\n    • Fuentes consultadas: LinkedIn Professional Network, Academic Research Network, Industry Professional Network\n    • Perfil objetivo: Especialista en ciberseguridad y protección anti-spam con experiencia en telecomunicaciones\n\n    Los expertos están listos para ser contactados según las estrategias de acercamiento recomendadas.",
+  "recommendations": [],
+  "generated_at": "2025-11-23T02:37:40.086146"
+}
