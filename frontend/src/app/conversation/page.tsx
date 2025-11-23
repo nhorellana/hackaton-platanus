@@ -260,13 +260,15 @@ export default function Conversation() {
 
   return (
     <div className="flex min-h-screen flex-col bg-(--color-background)">
-      {/* Process Stepper */}
-      <div className="w-full max-w-5xl mx-auto pt-6 px-6">
-        <ProcessStepper currentStep={currentStep} />
+      {/* Process Stepper - Fixed positioning */}
+      <div className="w-full bg-(--color-background) border-b border-(--color-border)/20">
+        <div className="w-full max-w-5xl mx-auto py-4 px-6">
+          <ProcessStepper currentStep={currentStep} />
+        </div>
       </div>
-      
+
       {/* Header */}
-      <header className="border-b border-(--color-border) bg-(--color-background) px-6 py-4 mt-6">
+      <header className="border-b border-(--color-border) bg-(--color-background) px-6 py-4">
         <div className="mx-auto flex max-w-4xl items-center justify-between">
           <button
             onClick={() => router.push("/")}
@@ -290,7 +292,7 @@ export default function Conversation() {
       {/* Messages Container */}
       <div
         className={`flex-1 overflow-y-auto px-4 py-8 ${
-          temperature >= 6 && !continueRefining ? "pb-8" : "pb-56"
+          temperature >= 6 && !continueRefining ? "pb-8" : "pb-80"
         }`}
       >
         <div className="mx-auto max-w-3xl space-y-6">
