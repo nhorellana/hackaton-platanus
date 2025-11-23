@@ -18,8 +18,9 @@ class ConversationMessage:
     timestamp: str
 
 class Anthropic():
-    def __init__(self, api_key):
+    def __init__(self, api_key, model: str = 'claude-sonnet-4-5-20250929'):
         self.api_key = api_key
+        self.model = model
 
     def send_message(self, messages: list[ConversationMessage], system: str | None = None, tools: list | None = None):
         '''
@@ -47,7 +48,7 @@ class Anthropic():
         }
 
         payload = {
-            'model': 'claude-sonnet-4-5-20250929',
+            'model': self.model,
             'max_tokens': 4096,
             "thinking": {
                 "type": "disabled"
