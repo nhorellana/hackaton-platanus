@@ -1,6 +1,6 @@
 'use client'
 
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { useState } from "react";
 import ReactMarkdown from 'react-markdown';
 import ProcessStepper from "@/components/ProcessStepper";
@@ -8,7 +8,9 @@ import { useProcessStep } from "@/hooks/useProcessStep";
 
 export default function Summary() {
     const router = useRouter();
+    const searchParams = useSearchParams();
     const currentStep = useProcessStep();
+    const sessionId = searchParams.get('session_id');
     const [summaryText] = useState(() => {
         // Only access localStorage on client side
         if (typeof window === 'undefined') return '';
@@ -45,7 +47,7 @@ export default function Summary() {
             <header className="border-b border-(--color-border) bg-(--color-background) px-6 py-4 mt-6">
                 <div className="mx-auto max-w-4xl grid grid-cols-3 items-center">
                     <button
-                        onClick={() => router.push('/jobs')}
+                        onClick={() => router.push(`/jobs${sessionId ? `?session_id=${sessionId}` : ''}`)}
                         className="cursor-pointer text-sm text-(--color-text-secondary) transition-colors hover:text-(--color-text) justify-self-start"
                     >
                         ← Volver
