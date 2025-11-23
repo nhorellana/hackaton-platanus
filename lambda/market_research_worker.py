@@ -245,7 +245,7 @@ def run_obstacles_analysis(problem_context):
             timestamp=datetime.utcnow().isoformat()
         )],
         system=system_prompt,
-        tools=tools
+        # tools=tools
     )
 
     return response
@@ -329,7 +329,7 @@ def run_solutions_analysis(problem_context, obstacles_findings):
             timestamp=datetime.utcnow().isoformat()
         )],
         system=system_prompt,
-        tools=tools
+        # tools=tools
     )
 
     return response
@@ -423,7 +423,7 @@ def run_legal_analysis(problem_context, obstacles_findings, solutions_findings):
             timestamp=datetime.utcnow().isoformat()
         )],
         system=system_prompt,
-        tools=tools
+        # tools=tools
     )
 
     return response
@@ -544,7 +544,7 @@ def run_competitor_analysis(problem_context, obstacles_findings, solutions_findi
             timestamp=datetime.utcnow().isoformat()
         )],
         system=system_prompt,
-        tools=tools
+        # tools=tools
     )
 
     return response
@@ -663,7 +663,7 @@ def run_market_analysis(problem_context, obstacles_findings, solutions_findings,
             timestamp=datetime.utcnow().isoformat()
         )],
         system=system_prompt,
-        tools=tools
+        # tools=tools
     )
 
     return response
